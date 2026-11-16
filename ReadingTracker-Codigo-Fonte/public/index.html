@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><link rel="stylesheet" href="reading-tracker-sandbox.css"></head>
+<body>
+<script type="module">
+  const widgetName = new URLSearchParams(location.search).get('widgetName');
+  const widgets = { index: './index-sandbox.js', 'reading-tracker': './reading-tracker-sandbox.js', 'reading-dashboard': './reading-dashboard-sandbox.js', 'document-progress': './document-progress-sandbox.js', 'lesson-progress': './lesson-progress-sandbox.js' };
+  if (widgetName === 'index' || widgetName === 'document-progress' || widgetName === 'lesson-progress') {
+    import(widgets[widgetName]).catch(console.error);
+  } else {
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.textContent = 'Carregando Reading Tracker…';
+    document.body.append(status);
+    const showError = (message) => {
+      status.textContent = message;
+      status.setAttribute('role', 'alert');
+    };
+    if (widgetName !== 'reading-tracker' && widgetName !== 'reading-dashboard') {
+      showError('O RemNote não informou um widget válido.');
+    } else {
+      const timeout = setTimeout(() => {
+        showError('O RemNote não inicializou o painel. Recarregue o plugin local e abra a aba novamente.');
+      }, 10000);
+      addEventListener('reading-tracker-ready', () => {
+        clearTimeout(timeout);
+        status.remove();
+      }, { once: true });
+      import(widgets[widgetName]).catch((error) => {
+        clearTimeout(timeout);
+        console.error(error);
+        showError('Não foi possível carregar o painel. Verifique o servidor local e recarregue o plugin.');
+      });
+    }
+  }
+</script>
+</body>
+</html>

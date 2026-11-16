@@ -1,0 +1,97 @@
+.rt-dashboard-frame,
+.rt-dashboard-frame body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.rt-dashboard-frame .reading-tracker-panel {
+  min-height: 100vh;
+  max-block-size: 100vh;
+  padding: 0 max(clamp(12px, 2.5vw, 30px), calc((100% - 1120px) / 2)) 24px;
+  scrollbar-gutter: stable;
+}
+
+.rt-dashboard-frame .rt-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  gap: 8px;
+  padding: 12px 0 10px;
+  margin-bottom: 10px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+}
+
+.rt-dashboard-frame .rt-header h1 {
+  font-size: 19px;
+  font-weight: 720;
+  letter-spacing: -.025em;
+}
+
+.rt-dashboard-frame .rt-tabs {
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  width: 100%;
+  max-width: 640px;
+}
+
+.rt-dashboard-frame .rt-view > * + * {
+  margin-top: 14px;
+}
+
+.rt-dashboard-frame .rt-view > :is(.rt-card, details) {
+  padding: clamp(12px, 2vw, 20px);
+}
+
+.rt-dashboard-frame .rt-search label {
+  flex: 0 1 34rem;
+}
+
+.rt-dashboard-frame [aria-label="Disciplinas por fase"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.rt-dashboard-frame [aria-label="Disciplinas por fase"] > h2 {
+  grid-column: 1 / -1;
+}
+
+.rt-dashboard-frame [aria-label="Disciplinas por fase"] > details {
+  margin: 0;
+}
+
+.rt-dashboard-frame :is([aria-label="Agenda de revisões"], [aria-label="Retomar estudos"]) ul:has(> .rt-row) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 10px;
+}
+
+.rt-dashboard-frame :is([aria-label="Agenda de revisões"], [aria-label="Retomar estudos"]) .rt-row {
+  align-content: start;
+  padding: 12px;
+}
+
+.rt-dashboard-frame [aria-label="Previsão de leitura"] {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.rt-dashboard-frame [aria-label="Progresso da aula"] {
+  scroll-margin-top: 116px;
+}
+
+@media (min-width: 760px) {
+  .rt-dashboard-frame .rt-header {
+    grid-template-columns: auto minmax(0, 640px);
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .rt-dashboard-frame [aria-label="Progresso da aula"] {
+    scroll-margin-top: 80px;
+  }
+}
