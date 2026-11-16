@@ -1,0 +1,24 @@
+{
+  "name": "reading-tracker",
+  "version": "0.1.4",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/bundle.mjs --dev",
+    "build": "tsc --noEmit && node scripts/bundle.mjs",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@remnote/plugin-sdk": "0.0.46",
+    "react": "17.0.2",
+    "react-dom": "17.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/react": "^17",
+    "@types/react-dom": "^17",
+    "esbuild": "^0.27",
+    "tsx": "^4",
+    "typescript": "~5.9.3"
+  }
+}
