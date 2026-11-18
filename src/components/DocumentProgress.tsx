@@ -1,10 +1,9 @@
 import { usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import { createRepository } from '../remnote/storage';
-import { summarize } from '../progress';
+import { documentMetrics } from '../document-metrics';
 import { useEffect } from 'react';
 import { studySteps } from '../study-steps';
 
-import { exerciseAccuracy } from '../exercise-results';
 
 const percent = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
 
@@ -26,23 +25,15 @@ export function DocumentProgress({ location, paneId }: {
       const [base, id] = await Promise.all([
         reactive.kb.getCurrentKnowledgeBaseData(),
         paneId ? reactive.window.getOpenPaneRemId(paneId) :
-          plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle | WidgetLocation.UnderRemEditor>()
+          reactive.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle | WidgetLocation.UnderRemEditor>()
             .then((context) => inline
               ? context && 'remId' in context ? context.remId : undefined
               : context && 'documentId' in context ? context.documentId : undefined),
       ]);
       if (!base?._id || !id) return null;
       const data = await createRepository(reactive.storage, base._id).load();
-      const own = data.lessons[id];
-      const exercise = data.exercises[id];
-      if (own || exercise) return {
-        ...summarize(own ? [own] : [], null), steps: own ? own.completedSteps ?? [] : null,
-        exercise: exercise ? { ...exerciseAccuracy(exercise), total: exercise.correct + exercise.incorrect } : null,
-      };
-      if (inline) return null;
       const document = await reactive.rem.findOne(id);
-      const records = (document?.children ?? []).flatMap((id) => data.lessons[id] ? [data.lessons[id]] : []);
-      return { ...summarize(records, null), steps: null, exercise: null };
+      return documentMetrics(data, id, document?.children ?? []);
     } catch (error) {
       console.error('Reading Tracker: progresso do documento', error);
       return null;
