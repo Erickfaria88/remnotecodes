@@ -27,7 +27,7 @@ export async function registerDashboardNote(plugin: RNPlugin) {
         }
         await plugin.app.registerWidget(widget, WidgetLocation.DocumentBelowTitle, {
           remIdFilter: note._id,
-          dimensions: { height: 680, width: '100%' },
+          dimensions: { height: 'auto', width: '100%' },
         });
         registeredId = note._id;
       }

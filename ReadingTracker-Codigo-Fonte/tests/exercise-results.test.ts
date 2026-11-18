@@ -26,3 +26,22 @@ test('guarda exercícios mesmo sem progresso de leitura e isola por base', async
   assert.deepEqual((await createRepository(store, 'base').load()).exercises.aula, { correct: 8, incorrect: 2 });
   assert.equal((await createRepository(store, 'outra').load()).exercises.aula, undefined);
 });
+
+test('acumula os exercícios e salva os campos da aula na mesma gravação', async () => {
+  let saved: unknown;
+  let writes = 0;
+  const repo = createRepository({
+    async getSynced<T>() { return saved as T | undefined; },
+    async setSynced(_key, value) { saved = JSON.parse(JSON.stringify(value)); writes++; },
+  }, 'base');
+  await repo.saveExercise('aula', { correct: 4, incorrect: 1 });
+  const progress = { totalPages: 28, readPages: 12 };
+  const result = await repo.saveStudy('aula', progress, '2026-11-17', 2, ['theory'], { correct: 10, incorrect: 0 });
+  assert.equal(writes, 2);
+  assert.deepEqual(result.exercises.aula, { correct: 14, incorrect: 1 });
+  assert.equal(exerciseAccuracy(result.exercises.aula).percent, '93,33%');
+  assert.deepEqual(result.lessons.aula, { ...progress, resumeOn: '2026-11-17', stars: 2, completedSteps: ['theory'] });
+  await assert.rejects(repo.saveStudy('aula', { ...progress, readPages: 29 }, null, null, [], { correct: 1, incorrect: 0 }));
+  assert.equal(writes, 2);
+  assert.deepEqual((await repo.load()).exercises.aula, result.exercises.aula);
+});

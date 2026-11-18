@@ -14,25 +14,30 @@ const exerciseColors = {
   red: { background: '#ffe8e6', color: '#912d28', borderColor: '#ec9c97' },
 };
 
-export function DocumentProgress({ location }: { location: WidgetLocation.DocumentBelowTitle | WidgetLocation.UnderRemEditor }) {
+export function DocumentProgress({ location, paneId }: {
+  location: WidgetLocation.DocumentBelowTitle | WidgetLocation.UnderRemEditor;
+  paneId?: string;
+}) {
   const plugin = usePlugin();
   useEffect(() => { window.dispatchEvent(new Event('reading-tracker-ready')); }, []);
   const metrics = useTrackerPlugin(async (reactive) => {
     try {
-      const [base, context] = await Promise.all([
-        reactive.kb.getCurrentKnowledgeBaseData(),
-        plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle | WidgetLocation.UnderRemEditor>(),
-      ]);
-      if (!base?._id || !context) return null;
       const inline = location === WidgetLocation.UnderRemEditor;
-      const id = inline ? ('remId' in context ? context.remId : undefined) : ('documentId' in context ? context.documentId : undefined);
-      if (!id) return null;
+      const [base, id] = await Promise.all([
+        reactive.kb.getCurrentKnowledgeBaseData(),
+        paneId ? reactive.window.getOpenPaneRemId(paneId) :
+          plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle | WidgetLocation.UnderRemEditor>()
+            .then((context) => inline
+              ? context && 'remId' in context ? context.remId : undefined
+              : context && 'documentId' in context ? context.documentId : undefined),
+      ]);
+      if (!base?._id || !id) return null;
       const data = await createRepository(reactive.storage, base._id).load();
       const own = data.lessons[id];
       const exercise = data.exercises[id];
       if (own || exercise) return {
         ...summarize(own ? [own] : [], null), steps: own ? own.completedSteps ?? [] : null,
-        exercise: exercise ? exerciseAccuracy(exercise) : null,
+        exercise: exercise ? { ...exerciseAccuracy(exercise), total: exercise.correct + exercise.incorrect } : null,
       };
       if (inline) return null;
       const document = await reactive.rem.findOne(id);
@@ -42,7 +47,7 @@ export function DocumentProgress({ location }: { location: WidgetLocation.Docume
       console.error('Reading Tracker: progresso do documento', error);
       return null;
     }
-  }, [plugin, location]);
+  }, [plugin, location, paneId]);
 
   if (!metrics || (metrics.percent === null && !metrics.exercise)) return null;
   return <section aria-label="Progresso de leitura" style={{
@@ -66,7 +71,7 @@ export function DocumentProgress({ location }: { location: WidgetLocation.Docume
       {metrics.exercise && <li style={{
         padding: '1px 6px', border: '1px solid', borderRadius: 8,
         ...exerciseColors[metrics.exercise.band],
-      }}>Questões · {metrics.exercise.percent} de acerto</li>}
+      }}>{metrics.exercise.total} {metrics.exercise.total === 1 ? 'questão' : 'questões'} · {metrics.exercise.percent} de acerto</li>}
     </ul>}
   </section>;
 }
