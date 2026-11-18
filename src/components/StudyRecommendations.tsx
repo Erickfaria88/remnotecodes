@@ -5,8 +5,8 @@ import type { Backup } from '../remnote/storage';
 
 interface LessonName { title: string; subject: string; subjectId: string }
 
-export function StudyRecommendations({ data, titles, busy, onOpen }: {
-  data: Backup; titles: Map<string, LessonName>; busy: boolean; onOpen: (id: string) => void;
+export function StudyRecommendations({ data, titles, busy, onOpen, onSelect }: {
+  data: Backup; titles: Map<string, LessonName>; busy: boolean; onOpen: (id: string) => void; onSelect: (id: string) => void;
 }) {
   const [duration, setDuration] = useState('');
   const subjects = new Map([...titles].map(([id, name]) => [id, name.subjectId]));
@@ -25,9 +25,11 @@ export function StudyRecommendations({ data, titles, busy, onOpen }: {
     return <ul>{diversifyLessons(items, subjects).slice(0, 3).map((item) => {
       const name = titles.get(item.id)!;
       return <li key={item.id} className="rt-row">
-        <strong>{name.title}</strong>
-        <span>{name.subject} · {item.phase ? 'Fase ' + item.phase : 'Sem fase'}</span>
-        <span>{item.stars}/5 ★ · {item.remaining} páginas · {item.minutes === null ? 'Sem estimativa' : '~' + item.minutes + ' min'}</span>
+        <button type="button" className="rt-row-main" disabled={busy} onClick={() => onSelect(item.id)}>
+          <strong>{name.title}</strong>
+          <span>{name.subject} · {item.phase ? 'Fase ' + item.phase : 'Sem fase'}</span>
+          <span>{item.stars}/5 ★ · {item.remaining} páginas · {item.minutes === null ? 'Sem estimativa' : '~' + item.minutes + ' min'}</span>
+        </button>
         <button type="button" className="rt-inline" disabled={busy} onClick={() => onOpen(item.id)}>Abrir aula</button>
       </li>;
     })}</ul>;

@@ -1,10 +1,80 @@
 # Reading Tracker
 
-Plugin React/TypeScript para registrar manualmente o progresso de PDFs externos por aula no RemNote Desktop. O manifesto usa o modo sandbox e o escopo `All / Read`. O plugin consulta os documentos e grava somente no armazenamento sincronizado do SDK.
+Organize suas leituras, revisões e exercícios dentro do RemNote. Veja onde parou em cada aula, quanto falta para terminar e quais materiais pode estudar no tempo disponível.
 
-## Desenvolvimento local
+O progresso dos PDFs é informado por você. Você pode manter seus PDFs externos e usar as aulas que já organizou no RemNote.
 
-Na pasta do projeto, com Node.js 22 ou superior e npm:
+## Instalar e abrir
+
+Instale a versão aprovada pela [página do Reading Tracker](https://www.remnote.com/plugins/reading-tracker). Depois, abra a busca de comandos do RemNote e procure **Abrir Reading Tracker** para usar a barra lateral ou **Abrir Dashboard de Estudos** para abrir o painel em um documento.
+
+A versão publicada funciona pela hospedagem do RemNote. Para utilizá-la, basta ter o plugin instalado e ativado.
+
+## Comece por uma disciplina
+
+1. Organize a disciplina como um documento-pai e cada aula como um documento-filho direto.
+2. Na aba **Disciplinas**, busque o nome da disciplina e selecione-a.
+3. Escolha uma aula e preencha **Páginas totais** e **Páginas lidas**. Em um PDF de 40 páginas, se você terminou a página 30, informe 40 e 30.
+4. Se desejar, marque as etapas concluídas, atribua de 0 a 5 estrelas à importância para a prova e escolha uma data para retomar.
+5. Clique em **Salvar estudo**.
+
+Você pode usar os nomes que preferir para os documentos. O plugin associa os registros ao ID da aula. Uma aula sem cadastro aparece como **Sem cadastro**. Ao cadastrar zero páginas lidas, ela passa a ter progresso de 0%.
+
+## As abas do painel
+
+| Aba | Como usar |
+| --- | --- |
+| **Retomar** | Consulte sugestões, retomadas de hoje, atrasadas e aulas quase concluídas. Clique no título da aula para preencher o estudo no próprio painel. |
+| **Disciplinas** | Cadastre o progresso das aulas e organize as disciplinas em Fase 1, Fase 2 e assim por diante. |
+| **Revisões** | Consulte revisões agendadas, abra a aula, conclua ou reagende a revisão. |
+| **Exercícios** | Selecione uma aula e registre novos acertos e erros junto com os demais campos do estudo. |
+| **Ajustes** | Defina o tempo diário, o ritmo de leitura e exporte ou restaure um backup JSON. |
+
+O botão **Abrir aula** leva ao documento no RemNote. Ao abrir uma aula pelo dashboard, o painel é recolhido e mantém um botão para expandir novamente. O resumo disponível da aula mostra páginas, etapas e desempenho em questões.
+
+## Registre exercícios sem perder o total
+
+Preencha **Novos acertos** e **Novos erros** com as questões que acabou de resolver. O plugin soma esses valores ao total já salvo da aula.
+
+Por exemplo, 4 acertos e 1 erro, seguidos de 10 acertos e nenhum erro, resultam em **15 questões, 14 acertos, 1 erro e 93,33% de acerto**.
+
+O botão **Salvar estudo** salva juntos os campos de leitura, importância, etapas, retomada e os novos exercícios preenchidos. Cada novo salvamento com exercícios soma mais questões. Após salvar, os campos de novos exercícios ficam vazios para o próximo registro.
+
+O indicador de questões fica verde a partir de 80%, amarelo de 60% até menos de 80% e vermelho abaixo de 60%.
+
+## Planeje a próxima sessão
+
+Classifique as disciplinas por fase e as aulas por importância. Em **Ajustes**, informe seu ritmo em páginas por hora. Você pode usar um ritmo global e definir outro para uma disciplina específica.
+
+As sugestões consideram importância, fase e tempo estimado para terminar a leitura. A lista diversifica as disciplinas e permite repetições quando o tempo acumulado da mesma disciplina cabe em 60 minutos.
+
+O tempo diário inicial é **4,5 horas** e pode ser alterado em **Ajustes**. A previsão de conclusão usa as páginas restantes, o ritmo informado e esse tempo diário. Materiais sem cadastro ou sem estimativa suficiente precisam ser preenchidos para uma previsão mais completa.
+
+## Agende uma revisão ou retomada
+
+Para continuar uma leitura depois, escolha a **Data de retomada** ou **Retomar amanhã** e salve o estudo.
+
+Para revisar um trecho, abra **Adicionar estudo à agenda**, informe a data em que estudou, a página inicial, a final e quantos dias deseja esperar. Clique em **Agendar revisão**. A revisão aparecerá na aba **Revisões**. Use intervalo de 1 dia para uma revisão no dia seguinte. O agendamento do plugin é manual e as sessões de flashcards continuam seguindo o agendador do RemNote.
+
+Depois de salvar uma retomada futura, você pode preparar um evento para o Google Calendar ou baixar um lembrete .ics. Confira e salve o evento no calendário escolhido. Alterações posteriores na data precisam ser ajustadas também no calendário.
+
+## Seus registros e o backup
+
+Os dados usam o armazenamento sincronizado do SDK do RemNote, com registros separados pelo ID da base e pelo ID da aula. Para usar em outro dispositivo, entre na mesma conta e base, ative o mesmo plugin e aguarde a sincronização.
+
+Em **Ajustes → Backup JSON**, exporte uma cópia dos registros. Para restaurar, selecione o arquivo e confira a confirmação. A restauração substitui os dados do Reading Tracker daquela base. O arquivo deve pertencer à mesma base.
+
+O cadastro de leitura e exercícios preserva o conteúdo das aulas, flashcards, tags e hierarquia. A criação do documento do dashboard e o envio de tarefas para a Nota de hoje ocorrem pelas ações correspondentes do painel.
+
+## Versão 0.1.5
+
+Esta versão inclui exercícios acumulados por aula, quantitativo de questões, formulário completo acessível por Retomar, atalhos para abrir aulas e dashboard recolhível com resumo do progresso.
+
+Registros de exercícios que versões anteriores sobrescreveram precisam ser corrigidos a partir de uma cópia ou anotação sua.
+
+## Para desenvolver o plugin
+
+Com Node.js 22 ou superior e npm, execute na pasta do projeto
 
 ```powershell
 npm ci
@@ -13,42 +83,14 @@ npm run build
 npm run dev
 ```
 
-Se o PowerShell bloquear o script npm.ps1, use npm.cmd. O servidor usa a porta 8080 e deve permanecer aberto durante o teste. Pare-o com Ctrl+C. Após alterar o manifesto, reinicie o servidor e recarregue o plugin. A compilação gera o manifesto, o HTML e os bundles em dist/.
+No Windows, use npm.cmd se necessário. O servidor de desenvolvimento usa http://localhost:8080. Configure essa origem na opção **Desenvolver a partir do localhost** do RemNote e recarregue o plugin após as alterações.
 
-No RemNote Desktop, com uma base de teste ativa, abra **Settings → Plugins / Plugins and Themes → Build → Develop from localhost**. Informe `http://localhost:8080`. Abra **Reading Tracker** na barra lateral direita. Confira o escopo de leitura solicitado. Esse fluxo é para desenvolvimento local. [Guia rápido oficial](https://plugins.remnote.com/getting-started/quick_start_guide)
-
-## Roteiro de teste no RemNote
-
-1. Em uma disciplina de teste, use três documentos-filhos diretos. Cadastre 10/10 e 0/90 páginas em duas aulas e deixe a terceira sem cadastro.
-2. Confirme a distinção entre 0% e Sem cadastro. Com ritmo global 30, confira 10%, 90 páginas restantes e 3 h. Com ritmo da disciplina 45, confira 2 h. Apague o ritmo da disciplina e salve para voltar ao global.
-3. Exporte o JSON, altere um registro, importe o arquivo e confirme a restauração. Verifique os valores e ritmos restaurados.
-4. Feche e reabra o Desktop. Verifique a persistência. Em outra base de teste, confirme que os dados da primeira não aparecem e que o backup da primeira é rejeitado.
-5. Compare conteúdo, flashcards, tags e estrutura da base de teste antes e depois de salvar. Para verificar sincronização real, abra a mesma base e o mesmo plugin em um segundo dispositivo com a mesma conta e confira os dados após sincronizar.
-6. Renomeie ou mova uma aula preservando o ID. Atualize a lista da disciplina para conferir a associação.
-
-## Dados e limites
-
-O armazenamento do SDK é sincronizado por usuário. A chave inclui o ID da base e contém um mapa de registros por ID de aula, um ritmo global da base e um mapa de ritmos por ID de disciplina. Uma importação validada e confirmada substitui esse conjunto inteiro em uma gravação. O JSON contém esses IDs e dados de leitura, sem os PDFs e sem os textos das notas.
-
-O painel lista somente documentos-filhos diretos da disciplina selecionada. Atualize a lista após mudanças na hierarquia. Aulas sem cadastro não entram nos totais. Backups só podem ser restaurados na base com o ID de origem. A API não documenta uma operação atômica de leitura e atualização entre dispositivos. Alterações simultâneas em instâncias diferentes podem sobrescrever dados da mesma base.
-
-Os testes automatizados usam um substituto serializável para o armazenamento sincronizado. A persistência real, a sincronização entre dispositivos e o seletor de arquivos e download do sandbox dependem da verificação no Desktop. O manifesto é destinado a localhost e o campo repoUrl precisa ser preenchido para publicação.
-
-
-## Retomadas e lembrete externo
-
-Na aula, informe o progresso, escolha **Retomar amanhã** ou preencha a data e clique em **Salvar progresso**. O painel **Retomar estudos** reúne as datas de hoje e atrasadas, as próximas retomadas e as aulas iniciadas com até 10 páginas ou 20 minutos restantes. Clique em uma aula da lista para carregar a disciplina e editar o progresso. Salvar a leitura como concluída remove a data de retomada. As datas fazem parte do backup JSON.
-
-Para receber um aviso fora do RemNote, depois de salvar a data abra **Notificação pelo calendário**, escolha o horário local e baixe o arquivo .ics. Importe-o no calendário em que recebe notificações e confirme o alerta no horário do evento. Se o sandbox bloquear o download, copie o conteúdo exibido para um arquivo .ics em UTF-8. O arquivo importado é uma cópia. Reagendar ou concluir no plugin exige atualizar ou excluir o evento no calendário. O RemNote e o servidor local podem estar fechados na hora do aviso.
-
-No Google Calendar, escolha **Preparar evento no Google Calendar** e abra o link gerado. Confira a agenda e o alerta antes de salvar. O link cria um formulário preenchido. Reagende eventos existentes no próprio Google Calendar para evitar duplicatas.
-
-## Publicação não listada
-
-Com o código em um repositório público do GitHub, gere o pacote usando PowerShell 7:
+Para gerar o ZIP de publicação, use PowerShell 7
 
 ```powershell
-./scripts/package-remnote.ps1 -RepositoryUrl 'https://github.com/CONTA/REPOSITORIO'
+./scripts/package-remnote.ps1 -RepositoryUrl 'https://github.com/Erickfaria88/remnotecodes'
 ```
 
-O script gera ReadingTracker-RemNote.zip com o manifesto de publicação, preservando o ID reading-tracker. O manifesto em public continua configurado para desenvolvimento local. Em Plugins e temas → Build → Upload plugin, envie o ZIP para a revisão do RemNote. Depois da aprovação, instale pelo link direto do plugin. Exporte o backup JSON na versão local antes de trocar para a versão publicada e confira os registros usando a mesma conta e base.
+O pacote de publicação mantém o ID reading-tracker e define o repositório público. As atualizações enviadas passam pela aprovação do RemNote.
+
+A API de armazenamento não documenta uma operação atômica de leitura e atualização entre dispositivos. Evite editar a mesma base em vários painéis ao mesmo tempo, pois uma gravação pode sobrescrever outra.

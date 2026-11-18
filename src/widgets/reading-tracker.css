@@ -107,8 +107,8 @@ body:has(> :only-child .reading-tracker-panel) { margin: 0; }
 .rt-subject-percent small { display: block; text-align: center; }
 .rt-review-subject { color: var(--success); font-weight: 650; }
 
-.reading-tracker-panel .rt-study-steps { margin-inline: 0; min-inline-size: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
-.reading-tracker-panel .rt-study-steps legend { font-weight: 650; }
+.reading-tracker-panel :is(.rt-study-steps, .rt-exercise-fields) { margin-inline: 0; min-inline-size: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.reading-tracker-panel :is(.rt-study-steps, .rt-exercise-fields) legend { font-weight: 650; }
 .reading-tracker-panel .rt-study-steps label { display: flex; align-items: center; gap: 8px; min-height: 28px; }
 .reading-tracker-panel .rt-study-steps input { width: auto; margin: 0; accent-color: #2651ba; }
 .reading-tracker-panel .rt-study-steps label:has(input:checked) {

@@ -92,9 +92,9 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, busy }:
           {forecast.unknown > 0 && <p>{forecast.unknown} {forecast.unknown === 1 ? 'aula pendente fora da estimativa' : 'aulas pendentes fora da estimativa'} por falta de ritmo ou documento indisponível.</p>}
         </>}
       </section>
-      <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} />
+      <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} onSelect={onSelect} />
       <h3>Para retomar hoje</h3>
-      {queue.due.length ? list(queue.due) : <p>Nenhuma retomada para hoje.</p>}
+      {queue.due.length ? list(queue.due, true) : <p>Nenhuma retomada para hoje.</p>}
       {queue.upcoming.length > 0 && <details><summary>Próximas retomadas ({queue.upcoming.length})</summary>
         {list(queue.upcoming)}</details>}
       {queue.short.length > 0 && <details open><summary>Quase concluídas</summary>

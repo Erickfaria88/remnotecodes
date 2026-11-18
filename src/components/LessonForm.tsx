@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { validProgress, type Progress } from '../progress';
+import { exerciseAccuracy, validExerciseResult, type ExerciseResult } from '../exercise-results';
 import { calendarReminder, googleCalendarUrl, studyDay, validStudyDay, type ReadingRecord } from '../resume';
 
 import { studySteps, type StudyStep } from '../study-steps';
@@ -7,15 +8,19 @@ import { studySteps, type StudyStep } from '../study-steps';
 interface Props {
   title: string;
   progress: ReadingRecord | undefined;
+  exercises?: ExerciseResult;
   busy: boolean;
   calendarId: string;
   lessonId: string;
-  onSave: (progress: Progress, resumeOn?: string | null, stars?: number | null, steps?: StudyStep[]) => Promise<void>;
+  onSave: (progress: Progress | undefined, resumeOn: string | null, stars: number | null,
+    steps: StudyStep[], exercises?: ExerciseResult) => Promise<void>;
 }
 
-export function LessonForm({ title, progress, busy, calendarId, lessonId, onSave }: Props) {
+export function LessonForm({ title, progress, exercises, busy, calendarId, lessonId, onSave }: Props) {
   const [total, setTotal] = useState(progress?.totalPages.toString() ?? '');
   const [read, setRead] = useState(progress?.readPages.toString() ?? '0');
+  const [correct, setCorrect] = useState('');
+  const [incorrect, setIncorrect] = useState('');
   const [error, setError] = useState('');
   const [day, setDay] = useState(progress?.resumeOn ?? '');
   const [stars, setStars] = useState(progress?.stars?.toString() ?? '');
@@ -64,8 +69,17 @@ export function LessonForm({ title, progress, busy, calendarId, lessonId, onSave
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const next = { totalPages: Number(total), readPages: Number(read) };
-    if (!read.trim() || !validProgress(next)) {
+    const result = correct !== '' || incorrect !== '' ? { correct: Number(correct), incorrect: Number(incorrect) } : undefined;
+    const readingChanged = total !== (progress?.totalPages.toString() ?? '') ||
+      read !== (progress?.readPages.toString() ?? '0') || day !== (progress?.resumeOn ?? '') ||
+      stars !== (progress?.stars?.toString() ?? '') ||
+      studySteps.some(({ id }) => steps.includes(id) !== Boolean(progress?.completedSteps?.includes(id)));
+    const next = readingChanged || !result ? { totalPages: Number(total), readPages: Number(read) } : undefined;
+    if (result && !validExerciseResult(result)) {
+      setError('Informe números inteiros e pelo menos uma questão respondida.');
+      return;
+    }
+    if (next && (!read.trim() || !validProgress(next))) {
       setError('Informe números inteiros. O total deve ser positivo e as páginas lidas devem estar entre zero e o total.');
       return;
     }
@@ -74,15 +88,15 @@ export function LessonForm({ title, progress, busy, calendarId, lessonId, onSave
       setError('Escolha uma data válida para a retomada.');
       return;
     }
-    await onSave(next, day || null, stars === '' ? null : Number(stars), steps);
+    await onSave(next, day || null, stars === '' ? null : Number(stars), steps, result);
   }
 
   return <form onSubmit={submit}>
     <h3>{title}</h3>
     <div className="fields">
-      <label>Páginas totais<input type="number" min="1" step="1" required value={total}
+      <label>Páginas totais<input type="number" min="1" step="1" value={total}
         onChange={(event) => setTotal(event.target.value)} /></label>
-      <label>Páginas lidas<input type="number" min="0" step="1" required value={read}
+      <label>Páginas lidas<input type="number" min="0" step="1" value={read}
         onChange={(event) => setRead(event.target.value)} /></label>
     </div>
     <label>Importância para a prova
@@ -123,7 +137,18 @@ export function LessonForm({ title, progress, busy, calendarId, lessonId, onSave
       {calendar && <label>Conteúdo do arquivo .ics<textarea rows={5} readOnly value={calendar}
         onFocus={(event) => event.currentTarget.select()} /></label>}
     </details>}
+    <fieldset className="rt-exercise-fields" disabled={busy}>
+      <legend>Exercícios</legend>
+      {exercises && <p><strong>{exerciseAccuracy(exercises).percent} de acerto</strong>
+        {' · '}{exercises.correct + exercises.incorrect} questões · {exercises.correct} acertos · {exercises.incorrect} erros</p>}
+      <div className="fields">
+        <label>Novos acertos<input type="number" min="0" step="1" value={correct}
+          onChange={(event) => setCorrect(event.target.value)} /></label>
+        <label>Novos erros<input type="number" min="0" step="1" value={incorrect}
+          onChange={(event) => setIncorrect(event.target.value)} /></label>
+      </div>
+    </fieldset>
     {error && <p role="alert">{error}</p>}
-    <button className="rt-primary" disabled={busy}>Salvar progresso</button>
+    <button className="rt-primary" disabled={busy}>Salvar estudo</button>
   </form>;
 }

@@ -140,20 +140,34 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
     return operation;
   }
 
+  function saveStudy(id: string, progress?: Progress, resumeOn?: string | null, stars?: number | null,
+    completedSteps?: StudyStep[], result?: ExerciseResult) {
+    return write(async () => {
+      const data = await load();
+      if (progress) {
+        const previous = data.lessons[id];
+        const date = resumeOn === undefined ? previous?.resumeOn : resumeOn;
+        const importance = stars === undefined ? previous?.stars : stars;
+        data.lessons[id] = { ...previous, ...progress, resumeOn: date ?? undefined, stars: importance ?? undefined, completedSteps: completedSteps ?? previous?.completedSteps };
+      }
+      if (result !== undefined) {
+        if (!validExerciseResult(result)) throw new Error('Resultado de exercícios inválido.');
+        const previous = data.exercises[id];
+        data.exercises[id] = {
+          correct: (previous?.correct ?? 0) + result.correct,
+          incorrect: (previous?.incorrect ?? 0) + result.incorrect,
+        };
+      }
+      return data;
+    });
+  }
+
   return {
     load,
-    saveLesson: (id: string, progress: Progress, resumeOn?: string | null, stars?: number | null, completedSteps?: StudyStep[]) => write(async () => {
-      const data = await load();
-      const date = resumeOn === undefined ? data.lessons[id]?.resumeOn : resumeOn;
-      const importance = stars === undefined ? data.lessons[id]?.stars : stars;
-      data.lessons[id] = { ...data.lessons[id], ...progress, resumeOn: date ?? undefined, stars: importance ?? undefined, completedSteps: completedSteps ?? data.lessons[id]?.completedSteps };
-      return data;
-    }),
-    saveExercise: (lessonId: string, result: ExerciseResult) => write(async () => {
-      const data = await load();
-      data.exercises[lessonId] = result;
-      return data;
-    }),
+    saveStudy,
+    saveLesson: (id: string, progress: Progress, resumeOn?: string | null, stars?: number | null, completedSteps?: StudyStep[]) =>
+      saveStudy(id, progress, resumeOn, stars, completedSteps),
+    saveExercise: (id: string, result: ExerciseResult) => saveStudy(id, undefined, undefined, undefined, undefined, result),
     scheduleReview: (row: ScheduledReview) => write(async () => {
       const data = await load();
       const id = [row.lessonId, row.studiedOn, row.interval, row.firstPage, row.lastPage, row.pages].join('_');

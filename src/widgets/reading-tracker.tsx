@@ -1,10 +1,11 @@
-import { renderWidget, usePlugin, type RNPlugin } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, WidgetLocation, type RNPlugin } from '@remnote/plugin-sdk';
+import { DocumentProgress } from '../components/DocumentProgress';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { validPhase } from '../recommendations';
 import { PhasedSubjects } from '../components/PhasedSubjects';
 import { ReviewAgenda, ScheduleReview } from '../components/ReviewAgenda';
 import type { StudyStep } from '../study-steps';
-import { ExerciseForm } from '../components/ExerciseForm';
+import type { ExerciseResult } from '../exercise-results';
 import { LessonForm } from '../components/LessonForm';
 import { ResumePanel } from '../components/ResumePanel';
 import { publishDailyTasks, type DailyTask } from '../remnote/daily-tasks';
@@ -25,6 +26,7 @@ stylesheet.href = styleUrl.href;
 document.head.append(stylesheet);
 
 type Subject = Awaited<ReturnType<typeof searchSubjects>>[number];
+const isDashboard = new URLSearchParams(location.search).get('widgetName') === 'reading-dashboard';
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : 'Ocorreu uma falha inesperada.';
@@ -83,6 +85,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const repository = useMemo(() => createRepository(plugin.storage, baseId), [plugin, baseId]);
   const [data, setData] = useState<Backup>();
   const [view, setView] = useState<'resume' | 'subjects' | 'settings' | 'agenda' | 'exercises'>('resume');
+  const [collapsed, setCollapsed] = useState(false);
+  const [lessonPaneId, setLessonPaneId] = useState<string>();
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<Subject[]>();
   const [subject, setSubject] = useState<Subject>();
@@ -147,6 +151,10 @@ function BaseTracker({ baseId }: { baseId: string }) {
   }
 
   function selectResume(id: string) {
+    if (selected === id) {
+      lessonEditor.current?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
     void run(async () => {
       const rem = await plugin.rem.findOne(id);
       const parent = rem && await rem.getParentRem();
@@ -156,16 +164,24 @@ function BaseTracker({ baseId }: { baseId: string }) {
       setSubject({ rem: parent, title: await documentTitle(plugin, parent), parent: undefined });
       setLessons(items);
       setMatches(undefined);
-      setView('subjects');
       setSelected(id);
     });
+  }
+
+  async function openLesson(rem: Lesson['rem']) {
+    const paneId = isDashboard ? await plugin.window.getFocusedPaneId().catch(() => undefined) : undefined;
+    await plugin.window.openRem(rem);
+    if (isDashboard) {
+      setLessonPaneId(paneId);
+      setCollapsed(true);
+    }
   }
 
   function openResume(id: string) {
     void run(async () => {
       const rem = await plugin.rem.findOne(id);
       if (!rem || !(await rem.isDocument())) throw new Error('A aula está indisponível.');
-      await plugin.window.openRem(rem);
+      await openLesson(rem);
     });
   }
 
@@ -187,16 +203,17 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const subjectPace = subjectId ? data?.subjectPaces[subjectId] : undefined;
   const pace = effectivePace(data?.globalPace ?? null, subjectPace);
 
-  async function saveLesson(progress: Progress, resumeOn?: string | null, stars?: number | null, steps?: StudyStep[]) {
+  async function saveLesson(progress: Progress | undefined, resumeOn: string | null, stars: number | null,
+    steps: StudyStep[], exercises?: ExerciseResult) {
     if (!lesson || !subjectId) return;
     await run(async () => {
       const current = await plugin.rem.findOne(lesson.rem._id);
       if (!current || current.parent !== subjectId || !(await current.isDocument())) {
         throw new Error('A aula mudou de disciplina ou está indisponível. Atualize a lista.');
       }
-      setData(await repository.saveLesson(lesson.rem._id, progress, resumeOn, stars, steps));
+      setData(await repository.saveStudy(lesson.rem._id, progress, resumeOn, stars, steps, exercises));
       setFormRevision((revision) => revision + 1);
-      setStatus('Progresso salvo.');
+      setStatus('Estudo salvo.');
     });
   }
 
@@ -244,10 +261,19 @@ function BaseTracker({ baseId }: { baseId: string }) {
     });
   }
 
-  return <main className="reading-tracker-panel" tabIndex={0} aria-label="Reading Tracker" aria-busy={busy}>
+  return <main className={collapsed ? 'reading-tracker-panel rt-dashboard-collapsed' : 'reading-tracker-panel'} tabIndex={0} aria-label="Reading Tracker" aria-busy={busy}>
     <header className="rt-header">
-      <h1>Reading Tracker</h1>
-      {data && <nav className="rt-tabs" aria-label="Seções do Reading Tracker">
+      {isDashboard ? <div className="rt-dashboard-heading">
+        <button type="button" className="rt-dashboard-toggle" aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expandir Reading Tracker' : 'Recolher Reading Tracker'}
+          title={collapsed ? 'Expandir Reading Tracker' : 'Recolher Reading Tracker'}
+          onClick={() => setCollapsed((value) => !value)}>
+          <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+          {collapsed && ' Reading Tracker'}
+        </button>
+        <h1 hidden={collapsed}>Reading Tracker</h1>
+      </div> : <h1>Reading Tracker</h1>}
+      {data && <nav hidden={collapsed} className="rt-tabs" aria-label="Seções do Reading Tracker">
         <button type="button" aria-pressed={view === 'resume'} onClick={() => setView('resume')}>Retomar</button>
         <button type="button" aria-pressed={view === 'subjects'} onClick={() => setView('subjects')}>Disciplinas</button>
         <button type="button" aria-pressed={view === 'agenda'} onClick={() => setView('agenda')}>Revisões</button>
@@ -255,6 +281,9 @@ function BaseTracker({ baseId }: { baseId: string }) {
         <button type="button" aria-pressed={view === 'settings'} onClick={() => setView('settings')}>Ajustes</button>
       </nav>}
     </header>
+    {collapsed && <div className="rt-dashboard-progress">
+      <DocumentProgress location={WidgetLocation.DocumentBelowTitle} paneId={lessonPaneId} />
+    </div>}
     {error && <p role="alert">{error}</p>}
     {status && <p role="status">{status}</p>}
     {!data && <button disabled={busy} onClick={() => void run(async () => setData(await repository.load()))}>
@@ -290,11 +319,6 @@ function BaseTracker({ baseId }: { baseId: string }) {
           </select>
         </label>}
         <button type="button" onClick={() => setView('subjects')}>Escolher disciplina</button>
-        {lesson && <ExerciseForm key={lesson.rem._id + ':' + formRevision} result={data.exercises[lesson.rem._id]}
-          busy={busy} onSave={(result) => void run(async () => {
-            setData(await repository.saveExercise(lesson.rem._id, result));
-            setStatus('Resultado dos exercícios salvo.');
-          })} />}
       </section>
     </div>}
     {data && <div hidden={view !== 'subjects'} className="rt-view">
@@ -331,22 +355,6 @@ function BaseTracker({ baseId }: { baseId: string }) {
           setData(await repository.load());
           setFormRevision((revision) => revision + 1);
         })}>Atualizar aulas e progresso</button>
-        {lesson && <section key={lesson.rem._id + ':' + formRevision} className="rt-card" ref={lessonEditor} aria-label="Progresso da aula">
-          <LessonForm title={lesson.title}
-            progress={record} busy={busy} calendarId={baseId + ":" + lesson.rem._id} lessonId={lesson.rem._id} onSave={saveLesson} />
-          <button type="button" disabled={busy} onClick={() => setView('exercises')}>Registrar exercícios</button>
-          <ScheduleReview lessonId={lesson.rem._id}
-            title={lesson.title} subject={subject.title} busy={busy}
-            onSave={(row) => void run(async () => {
-              setData(await repository.scheduleReview(row));
-              setView('agenda');
-              setStatus('Revisão agendada.');
-            })} />
-          {record && <LessonMetrics progress={record} pace={pace} />}
-          <button disabled={busy} onClick={() => void run(() => plugin.window.openRem(lesson.rem))}>
-            Abrir aula no RemNote
-          </button>
-        </section>}
         <SubjectDashboard lessons={lessons} records={data.lessons} pace={pace}
           selected={selected} onSelect={setSelected} />
       </section>}
@@ -356,6 +364,23 @@ function BaseTracker({ baseId }: { baseId: string }) {
           setStatus('Disciplina removida da fase.');
         })} />
     </div>}
+    {data && lesson && subject && <section key={lesson.rem._id + ':' + formRevision} className="rt-card rt-view"
+      hidden={view === 'settings' || view === 'agenda'} ref={lessonEditor} aria-label="Progresso da aula">
+          <LessonForm title={lesson.title}
+            progress={record} exercises={data.exercises[lesson.rem._id]} busy={busy}
+            calendarId={baseId + ":" + lesson.rem._id} lessonId={lesson.rem._id} onSave={saveLesson} />
+          <ScheduleReview lessonId={lesson.rem._id}
+            title={lesson.title} subject={subject.title} busy={busy}
+            onSave={(row) => void run(async () => {
+              setData(await repository.scheduleReview(row));
+              setView('agenda');
+              setStatus('Revisão agendada.');
+            })} />
+          {record && <LessonMetrics progress={record} pace={pace} />}
+          <button disabled={busy} onClick={() => void run(() => openLesson(lesson.rem))}>
+            Abrir aula no RemNote
+          </button>
+    </section>}
     <div hidden={!!data && view !== 'settings'} className="rt-view">
       {data && <form className="rt-card" key={data.dailyMinutes + ':' + formRevision} onSubmit={(event) => {
         event.preventDefault();

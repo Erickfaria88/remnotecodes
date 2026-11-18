@@ -1,15 +1,38 @@
 .rt-dashboard-frame,
 .rt-dashboard-frame body {
   margin: 0;
-  height: 100%;
-  overflow: hidden;
 }
 
 .rt-dashboard-frame .reading-tracker-panel {
-  min-height: 100vh;
-  max-block-size: 100vh;
+  max-block-size: 680px;
   padding: 0 max(clamp(12px, 2.5vw, 30px), calc((100% - 1120px) / 2)) 24px;
   scrollbar-gutter: stable;
+}
+
+.rt-dashboard-frame .rt-dashboard-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rt-dashboard-frame .rt-dashboard-toggle span {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.rt-dashboard-frame .rt-dashboard-collapsed {
+  padding: 6px 16px;
+  scrollbar-gutter: auto;
+}
+
+.rt-dashboard-frame .rt-dashboard-collapsed .rt-header {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rt-dashboard-frame .rt-dashboard-collapsed > :not(.rt-header, .rt-dashboard-progress) {
+  display: none;
 }
 
 .rt-dashboard-frame .rt-header {
