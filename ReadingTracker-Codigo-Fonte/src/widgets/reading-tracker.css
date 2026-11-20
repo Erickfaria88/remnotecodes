@@ -117,3 +117,8 @@ body:has(> :only-child .reading-tracker-panel) { margin: 0; }
   border-radius: 6px;
 }
 .reading-tracker-panel .rt-study-steps input:checked { accent-color: var(--success); }
+
+.rt-daily-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 10px; margin-block: 10px; }
+.rt-daily-grid > div { border: 1px solid var(--line); border-radius: 10px; background: var(--soft); padding: 12px; }
+.reading-tracker-panel .rt-attention-red { border-left: 4px solid #c34e45; }
+.reading-tracker-panel .rt-attention-yellow { border-left: 4px solid #c99528; }

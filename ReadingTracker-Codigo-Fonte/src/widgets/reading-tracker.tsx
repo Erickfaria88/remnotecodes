@@ -290,7 +290,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
       Recarregar progresso
     </button>}
     {data && <div hidden={view !== 'resume'} className="rt-view">
-      <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume} busy={busy} />
+      <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume}
+        onReviews={() => setView('agenda')} busy={busy} />
     </div>}
     {data && <div hidden={view !== 'agenda'} className="rt-view">
       <ReviewAgenda reviews={data.reviews} busy={busy} onOpen={openResume}
