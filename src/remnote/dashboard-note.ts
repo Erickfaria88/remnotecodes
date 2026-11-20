@@ -1,4 +1,5 @@
 import { WidgetLocation, type RNPlugin } from '@remnote/plugin-sdk';
+import { attachDashboard } from './lesson-dashboard';
 
 const title = 'Dashboard de Estudos';
 const widget = 'reading-dashboard';
@@ -20,15 +21,12 @@ export async function registerDashboardNote(plugin: RNPlugin) {
         if (!open) return;
         throw new Error('Já existe um tópico com esse nome. Transforme-o em documento ou renomeie-o.');
       }
-      if (registeredId !== note._id) {
+      if (open || registeredId !== note._id) {
         if (registeredId) {
           await plugin.app.unregisterWidget(widget, WidgetLocation.DocumentBelowTitle);
           registeredId = undefined;
         }
-        await plugin.app.registerWidget(widget, WidgetLocation.DocumentBelowTitle, {
-          remIdFilter: note._id,
-          dimensions: { height: 'auto', width: '100%' },
-        });
+        await attachDashboard(plugin, note._id);
         registeredId = note._id;
       }
       if (open) await plugin.window.openRem(note);

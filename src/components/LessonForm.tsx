@@ -13,7 +13,7 @@ interface Props {
   calendarId: string;
   lessonId: string;
   onSave: (progress: Progress | undefined, resumeOn: string | null, stars: number | null,
-    steps: StudyStep[], exercises?: ExerciseResult) => Promise<void>;
+    steps: StudyStep[], exercises?: ExerciseResult, replaceExercises?: boolean) => Promise<void>;
 }
 
 export function LessonForm({ title, progress, exercises, busy, calendarId, lessonId, onSave }: Props) {
@@ -21,6 +21,7 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
   const [read, setRead] = useState(progress?.readPages.toString() ?? '0');
   const [correct, setCorrect] = useState('');
   const [incorrect, setIncorrect] = useState('');
+  const [correctingExercises, setCorrectingExercises] = useState(false);
   const [error, setError] = useState('');
   const [day, setDay] = useState(progress?.resumeOn ?? '');
   const [stars, setStars] = useState(progress?.stars?.toString() ?? '');
@@ -75,7 +76,7 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
       stars !== (progress?.stars?.toString() ?? '') ||
       studySteps.some(({ id }) => steps.includes(id) !== Boolean(progress?.completedSteps?.includes(id)));
     const next = readingChanged || !result ? { totalPages: Number(total), readPages: Number(read) } : undefined;
-    if (result && !validExerciseResult(result)) {
+    if (result && !(correctingExercises && result.correct === 0 && result.incorrect === 0) && !validExerciseResult(result)) {
       setError('Informe números inteiros e pelo menos uma questão respondida.');
       return;
     }
@@ -88,7 +89,7 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
       setError('Escolha uma data válida para a retomada.');
       return;
     }
-    await onSave(next, day || null, stars === '' ? null : Number(stars), steps, result);
+    await onSave(next, day || null, stars === '' ? null : Number(stars), steps, result, correctingExercises);
   }
 
   return <form onSubmit={submit}>
@@ -141,14 +142,29 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
       <legend>Exercícios</legend>
       {exercises && <p><strong>{exerciseAccuracy(exercises).percent} de acerto</strong>
         {' · '}{exercises.correct + exercises.incorrect} questões · {exercises.correct} acertos · {exercises.incorrect} erros</p>}
+      {exercises && <button type="button" onClick={() => {
+        setCorrectingExercises((value) => !value);
+        setCorrect(correctingExercises ? '' : String(exercises.correct));
+        setIncorrect(correctingExercises ? '' : String(exercises.incorrect));
+        setError('');
+      }}>{correctingExercises ? 'Cancelar correção dos exercícios' : 'Corrigir totais de exercícios'}</button>}
+      {correctingExercises && <p>Informe os totais acumulados corretos desta aula. Ao confirmar, eles substituirão o registro atual.
+        Para remover o registro de questões, informe zero nos dois campos.</p>}
       <div className="fields">
-        <label>Novos acertos<input type="number" min="0" step="1" value={correct}
+        <label>{correctingExercises ? 'Total correto de acertos' : 'Novos acertos'}<input type="number" min="0" step="1" value={correct}
+          required={correctingExercises}
           onChange={(event) => setCorrect(event.target.value)} /></label>
-        <label>Novos erros<input type="number" min="0" step="1" value={incorrect}
+        <label>{correctingExercises ? 'Total correto de erros' : 'Novos erros'}<input type="number" min="0" step="1" value={incorrect}
+          required={correctingExercises}
           onChange={(event) => setIncorrect(event.target.value)} /></label>
       </div>
+      {correctingExercises && validExerciseResult({ correct: Number(correct), incorrect: Number(incorrect) }) && <p>
+        Novo total · {Number(correct) + Number(incorrect)} questões · {exerciseAccuracy({
+          correct: Number(correct), incorrect: Number(incorrect),
+        }).percent} de acerto
+      </p>}
     </fieldset>
     {error && <p role="alert">{error}</p>}
-    <button className="rt-primary" disabled={busy}>Salvar estudo</button>
+    <button className="rt-primary" disabled={busy}>{correctingExercises ? 'Confirmar correção e salvar estudo' : 'Salvar estudo'}</button>
   </form>;
 }
