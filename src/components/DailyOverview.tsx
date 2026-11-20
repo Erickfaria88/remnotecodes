@@ -1,6 +1,7 @@
 import type { Backup } from '../remnote/storage';
 import { attentionLessons } from '../study-attention';
 import { useState } from 'react';
+import { reviewBudget } from '../review-plan';
 
 type LessonName = { title: string; subject: string; subjectId: string };
 
@@ -13,7 +14,7 @@ export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onR
   const rows = attentionLessons(data, subjects, Number(minimum));
   const reviews = Object.values(data.reviews).filter((row) => !row.doneOn && row.dueOn <= today);
   const overdue = reviews.filter((row) => row.dueOn < today).length;
-  const reviewMinutes = Math.round(data.dailyMinutes / 3);
+  const reviewMinutes = reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).review;
   const few = [...titles.keys()].filter((id) => {
     const result = data.exercises[id];
     return result && result.correct + result.incorrect < Number(minimum);
@@ -23,7 +24,7 @@ export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onR
       <h3>Seu dia de estudos</h3>
       <div className="rt-daily-grid">
         <div><strong>{data.dailyMinutes} min disponíveis</strong><p>Tempo diário definido em Ajustes</p></div>
-        <div><strong>{reviewMinutes} min para revisão</strong><p>Sugestão de um terço do dia</p></div>
+        <div><strong>{reviewMinutes} min para revisão</strong><p>Reserva configurada em Ajustes</p></div>
         <div><strong>{data.dailyMinutes - reviewMinutes} min para avançar e reforçar</strong><p>Leitura e questões</p></div>
       </div>
       <button type="button" disabled={busy} onClick={onReviews}>

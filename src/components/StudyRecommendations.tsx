@@ -5,8 +5,9 @@ import type { Backup } from '../remnote/storage';
 
 interface LessonName { title: string; subject: string; subjectId: string }
 
-export function StudyRecommendations({ data, titles, busy, onOpen, onSelect }: {
+export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, availableMinutes }: {
   data: Backup; titles: Map<string, LessonName>; busy: boolean; onOpen: (id: string) => void; onSelect: (id: string) => void;
+  availableMinutes?: number;
 }) {
   const [duration, setDuration] = useState('');
   const subjects = new Map([...titles].map(([id, name]) => [id, name.subjectId]));
@@ -16,13 +17,20 @@ export function StudyRecommendations({ data, titles, busy, onOpen, onSelect }: {
   const [choice, setChoice] = useState('auto');
   const phase = choice === 'auto' ? phases[0] : Number(choice);
   const inPhase = rows.filter((row) => choice === 'all' || row.phase === phase);
-  const budget = duration === '' ? data.dailyMinutes : Number(duration);
-  const fitting = inPhase.filter((row) => row.minutes !== null && (budget <= 0 || row.minutes <= budget));
+  const budget = duration === '' ? availableMinutes ?? data.dailyMinutes : Number(duration);
+  const fitting = inPhase.filter((row) => row.minutes !== null && budget > 0 && row.minutes <= budget);
   const longer = budget > 0 ? inPhase.filter((row) => row.minutes !== null && row.minutes > budget) : [];
   const unknown = inPhase.filter((row) => row.minutes === null);
 
-  function list(items: typeof rows) {
-    return <ul>{diversifyLessons(items, subjects).slice(0, 3).map((item) => {
+  function list(items: typeof rows, fitTogether = false) {
+    let remaining = budget;
+    const selected = diversifyLessons(items, subjects).filter((item) => {
+      if (!fitTogether) return true;
+      if (item.minutes === null || item.minutes > remaining) return false;
+      remaining -= item.minutes;
+      return true;
+    }).slice(0, 3);
+    return <ul>{selected.map((item) => {
       const name = titles.get(item.id)!;
       return <li key={item.id} className="rt-row">
         <button type="button" className="rt-row-main" disabled={busy} onClick={() => onSelect(item.id)}>
@@ -46,10 +54,11 @@ export function StudyRecommendations({ data, titles, busy, onOpen, onSelect }: {
           {choice !== 'auto' && choice !== 'all' && !phases.includes(Number(choice)) &&
             <option value={choice}>Fase {choice}</option>}
         </select></label>
-        <label>Tempo deste bloco (min)<input type="number" min="1" placeholder={String(data.dailyMinutes)} value={duration}
+        <label>Tempo para avançar (min)<input type="number" min="1" placeholder={String(availableMinutes ?? data.dailyMinutes)} value={duration}
           onChange={(event) => setDuration(event.target.value)} /></label>
       </div>
-      {fitting.length ? list(fitting) : <p>Nenhuma aula com estimativa dentro do filtro.</p>}
+      <p>As sugestões principais, somadas, cabem no tempo para avançar.</p>
+      {fitting.length ? list(fitting, true) : <p>Nenhuma aula com estimativa dentro do filtro.</p>}
       {longer.length > 0 && <details><summary>Para um bloco maior</summary>{list(longer)}</details>}
       {unknown.length > 0 && <details><summary>Sem ritmo cadastrado</summary>{list(unknown)}</details>}
     </>}
