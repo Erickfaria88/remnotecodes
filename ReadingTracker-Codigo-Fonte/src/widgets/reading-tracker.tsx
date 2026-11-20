@@ -111,8 +111,11 @@ function BaseTracker({ baseId }: { baseId: string }) {
     handledRequest.current = request.token;
     setCollapsed(false);
     setView('exercises');
-    selectResume(request.lessonId);
-    void plugin.storage.setSession(lessonRequestKey(baseId), null);
+    void run(async () => {
+      await loadSelectedLesson(request.lessonId);
+      const latest = await plugin.storage.getSession<LessonDashboardRequest>(lessonRequestKey(baseId));
+      if (latest?.token === request.token) await plugin.storage.setSession(lessonRequestKey(baseId), null);
+    });
   }, [request, data, busy, baseId, plugin]);
 
   useEffect(() => {
@@ -170,7 +173,10 @@ function BaseTracker({ baseId }: { baseId: string }) {
       lessonEditor.current?.scrollIntoView({ block: 'nearest' });
       return;
     }
-    void run(async () => {
+    void run(() => loadSelectedLesson(id));
+  }
+
+  async function loadSelectedLesson(id: string) {
       const rem = await plugin.rem.findOne(id);
       const parent = rem && await rem.getParentRem();
       if (!parent || !(await parent.isDocument())) throw new Error('Disciplina indisponível.');
@@ -180,7 +186,6 @@ function BaseTracker({ baseId }: { baseId: string }) {
       setLessons(items);
       setMatches(undefined);
       setSelected(id);
-    });
   }
 
   async function openLesson(rem: Lesson['rem']) {
@@ -219,14 +224,14 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const pace = effectivePace(data?.globalPace ?? null, subjectPace);
 
   async function saveLesson(progress: Progress | undefined, resumeOn: string | null, stars: number | null,
-    steps: StudyStep[], exercises?: ExerciseResult) {
+    steps: StudyStep[], exercises?: ExerciseResult, replaceExercises = false) {
     if (!lesson || !subjectId) return;
     await run(async () => {
       const current = await plugin.rem.findOne(lesson.rem._id);
       if (!current || current.parent !== subjectId || !(await current.isDocument())) {
         throw new Error('A aula mudou de disciplina ou está indisponível. Atualize a lista.');
       }
-      setData(await repository.saveStudy(lesson.rem._id, progress, resumeOn, stars, steps, exercises));
+      setData(await repository.saveStudy(lesson.rem._id, progress, resumeOn, stars, steps, exercises, replaceExercises));
       setFormRevision((revision) => revision + 1);
       setStatus('Estudo salvo.');
     });

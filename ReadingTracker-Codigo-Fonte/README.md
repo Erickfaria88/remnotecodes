@@ -101,3 +101,11 @@ O plano diário reserva inicialmente um terço do tempo para revisão e estima 3
 ## Versão 0.1.9
 Clique no indicador de questões ou em Registrar estudo desta aula para abrir o Dashboard de Estudos com a aula selecionada. Crie o dashboard pelo comando correspondente uma vez. O plano de avanço usa automaticamente o tempo diário menos a reserva de revisão. Leitura, retomadas, aulas quase concluídas e exercícios compartilham um só orçamento. Cada aula entra uma vez na seleção. O plano considera fase, estrelas e benefício por minuto, com blocos de até 30 minutos de leitura e 20 minutos de questões. Aulas sem exercícios ou com poucas questões também entram na consulta de atenção. As listas de retomadas e quase concluídas ficam recolhidas para consulta. Os tempos são reservas sugeridas e não descontam automaticamente minutos já estudados; essa função dependerá de um registro de tempo.
 
+
+## Corrigir exercícios cadastrados
+No formulário da aula, clique em Corrigir totais de exercícios. Preencha os totais acumulados corretos de acertos e erros e confira a prévia. Clique em Confirmar correção e salvar estudo. Por exemplo, 43 acertos de 45 questões correspondem a 43 acertos e 2 erros. Zero nos dois campos remove o registro de exercícios. Depois da correção, Novos acertos e Novos erros voltam a somar os próximos lançamentos.
+
+
+## Versão 0.1.11
+O atalho Registrar estudo desta aula registra o widget no documento Dashboard de Estudos antes de abrir a nota. A seleção pendente da aula é consumida após carregar o formulário. O comando Abrir Dashboard de Estudos também refaz o registro ao abrir.
+

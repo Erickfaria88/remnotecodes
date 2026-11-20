@@ -45,3 +45,30 @@ test('acumula os exercícios e salva os campos da aula na mesma gravação', asy
   assert.equal(writes, 2);
   assert.deepEqual((await repo.load()).exercises.aula, result.exercises.aula);
 });
+
+test('corrige totais sem somar, preserva leitura e permite novos lançamentos após corrigir', async () => {
+  const values = new Map<string, unknown>();
+  const storage = {
+    async getSynced<T>(key: string) { return values.get(key) as T; },
+    async setSynced(key: string, value: unknown) { values.set(key, JSON.parse(JSON.stringify(value))); },
+  };
+  const repo = createRepository(storage, 'base');
+  await repo.saveLesson('aula', { totalPages: 62, readPages: 62 }, null, 5, ['theory']);
+  await repo.saveExercise('aula', { correct: 43, incorrect: 45 });
+  const corrected = await repo.saveStudy('aula', undefined, undefined, undefined, undefined,
+    { correct: 43, incorrect: 2 }, true);
+  assert.deepEqual(corrected.exercises.aula, { correct: 43, incorrect: 2 });
+  assert.equal(exerciseAccuracy(corrected.exercises.aula).percent, '95,55%');
+  assert.equal(corrected.lessons.aula.readPages, 62);
+  assert.deepEqual(corrected.lessons.aula.completedSteps, ['theory']);
+  assert.equal((await createRepository(storage, 'other').load()).exercises.aula, undefined);
+  await assert.rejects(repo.saveStudy('aula', undefined, undefined, undefined, undefined,
+    { correct: -1, incorrect: 2 }, true));
+  assert.deepEqual((await repo.load()).exercises.aula, { correct: 43, incorrect: 2 });
+  const added = await repo.saveExercise('aula', { correct: 1, incorrect: 0 });
+  assert.deepEqual(added.exercises.aula, { correct: 44, incorrect: 2 });
+  const cleared = await repo.saveStudy('aula', undefined, undefined, undefined, undefined,
+    { correct: 0, incorrect: 0 }, true);
+  assert.equal(cleared.exercises.aula, undefined);
+  assert.equal(cleared.lessons.aula.totalPages, 62);
+});

@@ -150,7 +150,7 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
   }
 
   function saveStudy(id: string, progress?: Progress, resumeOn?: string | null, stars?: number | null,
-    completedSteps?: StudyStep[], result?: ExerciseResult) {
+    completedSteps?: StudyStep[], result?: ExerciseResult, replaceExercises = false) {
     return write(async () => {
       const data = await load();
       if (progress) {
@@ -160,11 +160,13 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
         data.lessons[id] = { ...previous, ...progress, resumeOn: date ?? undefined, stars: importance ?? undefined, completedSteps: completedSteps ?? previous?.completedSteps };
       }
       if (result !== undefined) {
-        if (!validExerciseResult(result)) throw new Error('Resultado de exercícios inválido.');
+        const clear = replaceExercises && result.correct === 0 && result.incorrect === 0;
+        if (!clear && !validExerciseResult(result)) throw new Error('Resultado de exercícios inválido.');
         const previous = data.exercises[id];
-        data.exercises[id] = {
-          correct: (previous?.correct ?? 0) + result.correct,
-          incorrect: (previous?.incorrect ?? 0) + result.incorrect,
+        if (clear) delete data.exercises[id];
+        else data.exercises[id] = {
+          correct: (replaceExercises ? 0 : previous?.correct ?? 0) + result.correct,
+          incorrect: (replaceExercises ? 0 : previous?.incorrect ?? 0) + result.incorrect,
         };
       }
       return data;

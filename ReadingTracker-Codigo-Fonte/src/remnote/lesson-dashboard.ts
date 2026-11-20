@@ -1,4 +1,11 @@
-import type { RNPlugin } from '@remnote/plugin-sdk';
+import type { RNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
+
+export async function attachDashboard(plugin: RNPlugin, noteId: string) {
+  await plugin.app.registerWidget('reading-dashboard', 'DocumentBelowTitle' as WidgetLocation.DocumentBelowTitle, {
+    remIdFilter: noteId,
+    dimensions: { height: 'auto', width: '100%' },
+  });
+}
 
 export interface LessonDashboardRequest { lessonId: string; token: string }
 export const lessonRequestKey = (baseId: string) => 'reading-tracker:open-lesson:' + baseId;
@@ -9,6 +16,7 @@ export async function openLessonDashboard(plugin: RNPlugin, lessonId: string) {
   if (!note || !await note.isDocument()) {
     throw new Error('Abra o comando Abrir Dashboard de Estudos uma vez para criar o dashboard.');
   }
+  await attachDashboard(plugin, note._id);
   await plugin.storage.setSession(lessonRequestKey(base._id), {
     lessonId, token: crypto.randomUUID(),
   } satisfies LessonDashboardRequest);
