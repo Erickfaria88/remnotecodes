@@ -151,6 +151,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
   }
 
   function selectResume(id: string) {
+    if (view === 'agenda') setView('resume');
     if (selected === id) {
       lessonEditor.current?.scrollIntoView({ block: 'nearest' });
       return;
@@ -290,10 +291,12 @@ function BaseTracker({ baseId }: { baseId: string }) {
       Recarregar progresso
     </button>}
     {data && <div hidden={view !== 'resume'} className="rt-view">
-      <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume}
-        onReviews={() => setView('agenda')} busy={busy} />
+      {view === 'resume' && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume}
+        onReviews={() => setView('agenda')} busy={busy} />}
     </div>}
     {data && <div hidden={view !== 'agenda'} className="rt-view">
+      {view === 'agenda' && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume}
+        onPublish={publishResume} onReviews={() => setView('agenda')} busy={busy} reviewOnly />}
       <ReviewAgenda reviews={data.reviews} busy={busy} onOpen={openResume}
         onAdd={() => { setView('subjects'); setStatus('Escolha a aula e abra Adicionar estudo à agenda.'); }}
         onDone={(id) => void run(async () => {
@@ -398,6 +401,27 @@ function BaseTracker({ baseId }: { baseId: string }) {
         </label>
         <button className="rt-primary" disabled={busy}>Salvar tempo diário</button>
       </form>}
+      {data && <details>
+        <summary>Planejamento das revisões</summary>
+        <form key={'review-settings:' + formRevision} onSubmit={(event) => {
+          event.preventDefault();
+          const fields = new FormData(event.currentTarget);
+          void run(async () => {
+            setData(await repository.saveReviewSettings(Number(fields.get('share')), Number(fields.get('seconds'))));
+            setStatus('Configuração das revisões salva.');
+          });
+        }}>
+          <label>Percentual do dia para revisão
+            <select name="share" defaultValue={String(data.reviewShare ?? 100 / 3)}>
+              <option value={String(100 / 3)}>Um terço · 33,3%</option>
+              {[20, 25, 30, 40, 50, 75, 100].map((value) => <option key={value} value={value}>{value}%</option>)}
+            </select>
+          </label>
+          <label>Segundos por flashcard<input name="seconds" type="number" min="1" max="600" step="1"
+            required defaultValue={data.secondsPerCard ?? 30} /></label>
+          <button disabled={busy}>Salvar planejamento de revisão</button>
+        </form>
+      </details>}
       {data && <details>
         <summary>Ritmo de leitura</summary>
         <PaceForm key={(subjectId ?? '') + ':' + formRevision} globalPace={data.globalPace}

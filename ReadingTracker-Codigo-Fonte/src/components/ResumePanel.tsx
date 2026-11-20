@@ -3,16 +3,19 @@ import { useEffect, useState } from 'react';
 import { remainingWork } from '../study-budget';
 import { StudyRecommendations } from './StudyRecommendations';
 import { DailyOverview } from './DailyOverview';
+import { FlashcardPlan } from './FlashcardPlan';
+import { reviewBudget } from '../review-plan';
 import type { RNPlugin } from '@remnote/plugin-sdk';
 import type { Backup } from '../remnote/storage';
 import type { DailyTask } from '../remnote/daily-tasks';
 import { documentTitle } from '../remnote/documents';
 import { readingQueue, studyDay } from '../resume';
 
-export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onReviews, busy }: {
+export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onReviews, busy, reviewOnly = false }: {
   plugin: RNPlugin; data: Backup; busy: boolean; onSelect: (id: string) => void; onOpen: (id: string) => void;
   onPublish: (tasks: DailyTask[], day: string) => Promise<boolean>;
   onReviews: () => void;
+  reviewOnly?: boolean;
 }) {
   const [titles, setTitles] = useState<Map<string, { title: string; subject: string; subjectId: string }>>();
   const [failed, setFailed] = useState(false);
@@ -56,7 +59,8 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   }, [plugin, data]);
 
   const subjects = new Map(Array.from(titles ?? [], ([id, entry]) => [id, entry.subjectId]));
-  const forecast = remainingWork(data.lessons, subjects, data.globalPace, data.subjectPaces, data.dailyMinutes);
+  const studyMinutes = reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study;
+  const forecast = remainingWork(data.lessons, subjects, data.globalPace, data.subjectPaces, Math.max(1, studyMinutes));
   const queue = readingQueue(data.lessons, today, data.globalPace, data.subjectPaces, subjects);
   const limit = Number(minutes);
   const eligible = limit > 0 ? queue.short.filter((row) => row.minutes !== null && row.minutes <= limit) : queue.short;
@@ -79,6 +83,11 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     })}</ul>;
   }
 
+  if (reviewOnly) return <section className="rt-card" aria-label="Blocos de revisão">
+    {failed ? <p role="alert">Não foi possível consultar as aulas.</p> : !titles ? <p>Carregando aulas…</p> :
+      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} />}
+  </section>;
+
   return <section className="rt-card" aria-label="Retomar estudos">
     <h2>Retomar estudos</h2>
     {failed ? <p role="alert">Não foi possível consultar as aulas de retomada.</p> : !titles ? <p>Carregando…</p> : <>
@@ -87,13 +96,16 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
       <section aria-label="Previsão de leitura">
         <h3>Previsão de conclusão</h3>
         {forecast.pending === 0 ? <p>Nenhum material cadastrado pendente.</p> : <>
-          {forecast.unknown < forecast.pending &&
+          {studyMinutes > 0 && forecast.unknown < forecast.pending &&
             <p><strong>{forecast.days} {forecast.days === 1 ? 'dia' : 'dias'}</strong> · {forecast.hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h restantes</p>}
-          <p>{(data.dailyMinutes / 60).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} h de leitura por dia · materiais cadastrados</p>
+          <p>{(studyMinutes / 60).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} h por dia para avançar · reserva de revisão descontada</p>
+          {studyMinutes === 0 && <p>Ajuste a reserva de revisão para estimar a conclusão das leituras.</p>}
           {forecast.unknown > 0 && <p>{forecast.unknown} {forecast.unknown === 1 ? 'aula pendente fora da estimativa' : 'aulas pendentes fora da estimativa'} por falta de ritmo ou documento indisponível.</p>}
         </>}
       </section>
-      <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} onSelect={onSelect} />
+      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} />
+      <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} onSelect={onSelect}
+        availableMinutes={reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study} />
       <h3>Para retomar hoje</h3>
       {queue.due.length ? list(queue.due, true) : <p>Nenhuma retomada para hoje.</p>}
       {queue.upcoming.length > 0 && <details><summary>Próximas retomadas ({queue.upcoming.length})</summary>

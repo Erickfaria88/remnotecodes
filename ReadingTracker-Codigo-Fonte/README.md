@@ -94,3 +94,6 @@ Para gerar o ZIP de publicação, use PowerShell 7
 O pacote de publicação mantém o ID reading-tracker e define o repositório público. As atualizações enviadas passam pela aprovação do RemNote.
 
 A API de armazenamento não documenta uma operação atômica de leitura e atualização entre dispositivos. Evite editar a mesma base em vários painéis ao mesmo tempo, pois uma gravação pode sobrescrever outra.
+## Versão 0.1.8
+O plano diário reserva inicialmente um terço do tempo para revisão e estima 30 segundos por flashcard. Ajuste a reserva e a velocidade em Ajustes → Planejamento das revisões. Retomar e Revisões exibem blocos de até 30 minutos e permitem abrir a prática nativa dos cartões selecionados. Atualize os blocos após estudar. A consulta considera cartões com data até o fim do dia nas aulas cadastradas e seus descendentes hierárquicos. Cartões novos sem data e referências por portais ficam fora dessa estimativa. A duração pode mudar quando cartões reaparecem na prática. A primeira consulta pode levar mais tempo em bases grandes.
+

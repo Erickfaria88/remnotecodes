@@ -20,6 +20,8 @@ export interface Backup {
   reviews: Record<string, ScheduledReview>;
   exercises: Record<string, ExerciseResult>;
   dailyMinutesCustomized?: true;
+  reviewShare?: number;
+  secondsPerCard?: number;
 }
 
 interface SyncedStorage {
@@ -90,6 +92,12 @@ export function parseBackup(value: unknown, baseId: string): Backup {
   }
   const dailyMinutes = value.dailyMinutes === undefined ? defaultDailyMinutes : value.dailyMinutes;
   if (!validDailyMinutes(dailyMinutes)) throw new Error('Tempo diário inválido.');
+  const reviewShare = value.reviewShare === undefined ? 100 / 3 : value.reviewShare;
+  const secondsPerCard = value.secondsPerCard === undefined ? 30 : value.secondsPerCard;
+  if (typeof reviewShare !== 'number' || !Number.isFinite(reviewShare) || reviewShare < 0 || reviewShare > 100 ||
+      typeof secondsPerCard !== 'number' || !Number.isFinite(secondsPerCard) || secondsPerCard < 1 || secondsPerCard > 600) {
+    throw new Error('Configuração de revisão inválida.');
+  }
   const rawReviews = value.reviews === undefined ? {} : value.reviews;
   if (!isObject(rawReviews)) throw new Error('Agenda de revisões inválida.');
   const reviews: Backup['reviews'] = Object.create(null);
@@ -105,7 +113,8 @@ export function parseBackup(value: unknown, baseId: string): Backup {
     if (!validId(id) || !validExerciseResult(result)) throw new Error('Resultado de exercícios inválido.');
     exercises[id] = { correct: result.correct, incorrect: result.incorrect };
   }
-  return { version: 1, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, ...(value.dailyMinutesCustomized === true ? { dailyMinutesCustomized: true as const } : {}) };
+  return { version: 1, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes,
+    reviewShare, secondsPerCard, ...(value.dailyMinutesCustomized === true ? { dailyMinutesCustomized: true as const } : {}) };
 }
 
 function migrateDailyDefault(value: unknown) {
@@ -192,6 +201,9 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
       const data = await load();
       return { ...data, dailyMinutes, dailyMinutesCustomized: true };
     }),
+    saveReviewSettings: (reviewShare: number, secondsPerCard: number) => write(async () => ({
+      ...await load(), reviewShare, secondsPerCard,
+    })),
     savePhase: (subjectId: string, phase: number | null) => write(async () => {
       const data = await load();
       if (phase === null) delete data.subjectPhases[subjectId];
