@@ -2,15 +2,17 @@ import { diversifyLessons } from '../diversify-lessons';
 import { useEffect, useState } from 'react';
 import { remainingWork } from '../study-budget';
 import { StudyRecommendations } from './StudyRecommendations';
+import { DailyOverview } from './DailyOverview';
 import type { RNPlugin } from '@remnote/plugin-sdk';
 import type { Backup } from '../remnote/storage';
 import type { DailyTask } from '../remnote/daily-tasks';
 import { documentTitle } from '../remnote/documents';
 import { readingQueue, studyDay } from '../resume';
 
-export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, busy }: {
+export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onReviews, busy }: {
   plugin: RNPlugin; data: Backup; busy: boolean; onSelect: (id: string) => void; onOpen: (id: string) => void;
   onPublish: (tasks: DailyTask[], day: string) => Promise<boolean>;
+  onReviews: () => void;
 }) {
   const [titles, setTitles] = useState<Map<string, { title: string; subject: string; subjectId: string }>>();
   const [failed, setFailed] = useState(false);
@@ -32,10 +34,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, busy }:
     let active = true;
     setFailed(false);
     async function load() {
-      const ids = Object.keys(data.lessons).filter((id) => {
-        const record = data.lessons[id];
-        return record.readPages < record.totalPages;
-      });
+      const ids = [...new Set([...Object.keys(data.lessons), ...Object.keys(data.exercises)])];
       const rems = ids.length ? await plugin.rem.findMany(ids) : [];
       if (!rems) throw new Error('Aulas indisponíveis.');
       const parents = [...new Set(rems.flatMap((rem) => rem.parent ? [rem.parent] : []))];
@@ -83,6 +82,8 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, busy }:
   return <section className="rt-card" aria-label="Retomar estudos">
     <h2>Retomar estudos</h2>
     {failed ? <p role="alert">Não foi possível consultar as aulas de retomada.</p> : !titles ? <p>Carregando…</p> : <>
+      <DailyOverview data={data} titles={titles} today={today} busy={busy}
+        onSelect={onSelect} onOpen={onOpen} onReviews={onReviews} />
       <section aria-label="Previsão de leitura">
         <h3>Previsão de conclusão</h3>
         {forecast.pending === 0 ? <p>Nenhum material cadastrado pendente.</p> : <>
