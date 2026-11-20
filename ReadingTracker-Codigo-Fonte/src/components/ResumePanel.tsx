@@ -20,7 +20,6 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   const [titles, setTitles] = useState<Map<string, { title: string; subject: string; subjectId: string }>>();
   const [failed, setFailed] = useState(false);
   const [today, setToday] = useState(studyDay);
-  const [minutes, setMinutes] = useState('');
   const [preview, setPreview] = useState<{ tasks: DailyTask[]; day: string }>();
 
   useEffect(() => {
@@ -62,9 +61,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   const studyMinutes = reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study;
   const forecast = remainingWork(data.lessons, subjects, data.globalPace, data.subjectPaces, Math.max(1, studyMinutes));
   const queue = readingQueue(data.lessons, today, data.globalPace, data.subjectPaces, subjects);
-  const limit = Number(minutes);
-  const eligible = limit > 0 ? queue.short.filter((row) => row.minutes !== null && row.minutes <= limit) : queue.short;
-  const short = diversifyLessons(eligible, subjects);
+  const short = diversifyLessons(queue.short, subjects);
 
   function list(rows: typeof queue.due, showOpen = false) {
     return <ul>{rows.map((row) => {
@@ -106,15 +103,15 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
       <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} />
       <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} onSelect={onSelect}
         availableMinutes={reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study} />
-      <h3>Para retomar hoje</h3>
-      {queue.due.length ? list(queue.due, true) : <p>Nenhuma retomada para hoje.</p>}
+      {queue.due.length > 0 && <details><summary>Consultar retomadas de hoje e atrasadas · {queue.due.length}</summary>
+        <p>As retomadas concorrem por tempo no plano único de avanço.</p>
+        {list(queue.due, true)}
+      </details>}
       {queue.upcoming.length > 0 && <details><summary>Próximas retomadas ({queue.upcoming.length})</summary>
         {list(queue.upcoming)}</details>}
-      {queue.short.length > 0 && <details open><summary>Quase concluídas</summary>
-        <label>Tempo disponível em minutos
-          <input type="number" min="1" value={minutes} onChange={(event) => setMinutes(event.target.value)} />
-        </label>
-        {short.length ? list(short, true) : <p>Nenhuma leitura com estimativa dentro desse tempo.</p>}
+      {queue.short.length > 0 && <details><summary>Consultar leituras quase concluídas · {queue.short.length}</summary>
+        <p>Leituras curtas também participam da seleção do plano único de avanço.</p>
+        {list(short, true)}
         {!preview && short.length > 0 && <button type="button" disabled={busy} onClick={() => {
           const tasks = short.flatMap(({ id, remaining, minutes }) => {
             const entry = titles.get(id);

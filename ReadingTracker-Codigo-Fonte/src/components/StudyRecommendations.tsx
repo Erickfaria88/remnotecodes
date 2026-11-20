@@ -1,66 +1,53 @@
-import { diversifyLessons } from '../diversify-lessons';
 import { useState } from 'react';
-import { studyRecommendations } from '../recommendations';
+import { buildAdvancePlan } from '../advance-plan';
+import { studyDay } from '../resume';
+import { reviewBudget } from '../review-plan';
 import type { Backup } from '../remnote/storage';
 
 interface LessonName { title: string; subject: string; subjectId: string }
 
 export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, availableMinutes }: {
-  data: Backup; titles: Map<string, LessonName>; busy: boolean; onOpen: (id: string) => void; onSelect: (id: string) => void;
-  availableMinutes?: number;
+  data: Backup; titles: Map<string, LessonName>; busy: boolean; onOpen: (id: string) => void;
+  onSelect: (id: string) => void; availableMinutes?: number;
 }) {
-  const [duration, setDuration] = useState('');
-  const subjects = new Map([...titles].map(([id, name]) => [id, name.subjectId]));
-  const rows = studyRecommendations(data.lessons, subjects,
-    data.subjectPhases, data.subjectPaces, data.globalPace);
-  const phases = [...new Set(rows.flatMap((row) => row.phase === undefined ? [] : [row.phase]))].sort((a, b) => a - b);
   const [choice, setChoice] = useState('auto');
-  const phase = choice === 'auto' ? phases[0] : Number(choice);
-  const inPhase = rows.filter((row) => choice === 'all' || row.phase === phase);
-  const budget = duration === '' ? availableMinutes ?? data.dailyMinutes : Number(duration);
-  const fitting = inPhase.filter((row) => row.minutes !== null && budget > 0 && row.minutes <= budget);
-  const longer = budget > 0 ? inPhase.filter((row) => row.minutes !== null && row.minutes > budget) : [];
-  const unknown = inPhase.filter((row) => row.minutes === null);
-
-  function list(items: typeof rows, fitTogether = false) {
-    let remaining = budget;
-    const selected = diversifyLessons(items, subjects).filter((item) => {
-      if (!fitTogether) return true;
-      if (item.minutes === null || item.minutes > remaining) return false;
-      remaining -= item.minutes;
-      return true;
-    }).slice(0, 3);
-    return <ul>{selected.map((item) => {
-      const name = titles.get(item.id)!;
-      return <li key={item.id} className="rt-row">
-        <button type="button" className="rt-row-main" disabled={busy} onClick={() => onSelect(item.id)}>
-          <strong>{name.title}</strong>
-          <span>{name.subject} · {item.phase ? 'Fase ' + item.phase : 'Sem fase'}</span>
-          <span>{item.stars}/5 ★ · {item.remaining} páginas · {item.minutes === null ? 'Sem estimativa' : '~' + item.minutes + ' min'}</span>
-        </button>
-        <button type="button" className="rt-inline" disabled={busy} onClick={() => onOpen(item.id)}>Abrir aula</button>
-      </li>;
-    })}</ul>;
-  }
-
+  const subjects = new Map([...titles].map(([id, name]) => [id, name.subjectId]));
+  const phases = [...new Set([...subjects.values()].flatMap((id) => data.subjectPhases[id] ? [data.subjectPhases[id]] : []))].sort((a, b) => a - b);
+  const budget = availableMinutes ?? reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study;
+  const automaticPhase = buildAdvancePlan(data, subjects, budget, studyDay(), null).selected[0]?.phase;
+  const phase = choice === 'all' ? null : choice === 'auto' ? automaticPhase ?? null : Number(choice);
+  const plan = buildAdvancePlan(data, subjects, budget, studyDay(), phase);
   return <section aria-label="O que estudar agora?">
     <h3>O que estudar agora?</h3>
-    {rows.length === 0 ? <p>Classifique uma aula pendente em Disciplinas para receber sugestões.</p> : <>
-      <div className="fields">
-        <label>Fase<select value={choice} onChange={(event) => setChoice(event.target.value)}>
-          <option value="auto">Automática{phases[0] ? ' · Fase ' + phases[0] : ''}</option>
-          <option value="all">Todas</option>
-          {phases.map((number) => <option key={number} value={number}>Fase {number}</option>)}
-          {choice !== 'auto' && choice !== 'all' && !phases.includes(Number(choice)) &&
-            <option value={choice}>Fase {choice}</option>}
-        </select></label>
-        <label>Tempo para avançar (min)<input type="number" min="1" placeholder={String(availableMinutes ?? data.dailyMinutes)} value={duration}
-          onChange={(event) => setDuration(event.target.value)} /></label>
-      </div>
-      <p>As sugestões principais, somadas, cabem no tempo para avançar.</p>
-      {fitting.length ? list(fitting, true) : <p>Nenhuma aula com estimativa dentro do filtro.</p>}
-      {longer.length > 0 && <details><summary>Para um bloco maior</summary>{list(longer)}</details>}
-      {unknown.length > 0 && <details><summary>Sem ritmo cadastrado</summary>{list(unknown)}</details>}
-    </>}
+    <div className="fields">
+      <label>Fase<select value={choice} onChange={(event) => setChoice(event.target.value)}>
+        <option value="auto">Automática{automaticPhase ? ' · Fase ' + automaticPhase : ''}</option>
+        <option value="all">Todas</option>
+        {phases.map((value) => <option key={value} value={value}>Fase {value}</option>)}
+      </select></label>
+      <label>Tempo para avançar (min)<input type="number" readOnly value={budget} /></label>
+    </div>
+    <p>Plano único de leitura e questões · {plan.totalMinutes} de {budget} min distribuídos.
+      Retomadas, leituras quase concluídas e reforços entram neste mesmo orçamento.</p>
+    <p>Prioridade por fase e benefício por minuto, considerando estrelas, retomadas e necessidade de exercícios.
+      Blocos de leitura de até 30 min e sessões de questões de até 20 min.</p>
+    {plan.selected.length === 0 ? <p>Nenhuma atividade disponível nesta fase. Confira as aulas cadastradas ou selecione Todas.</p> :
+      <ul>{plan.selected.map((item) => {
+        const name = titles.get(item.id)!;
+        return <li className="rt-row" key={item.id}>
+          <button className="rt-row-main" type="button" disabled={busy} onClick={() => onSelect(item.id)}>
+            <strong>{name.title}</strong>
+            <span>{name.subject} · {item.phase ? 'Fase ' + item.phase : 'Sem fase'} · {item.stars}/5 ★</span>
+            <span><strong>{item.minutes} min · {item.practice ? 'Resolver questões / reforçar' : 'Avançar na leitura'}</strong></span>
+            {item.remaining > 0 && <span>Faltam {item.remaining} páginas{item.readingMinutes ? ' · ~' + item.readingMinutes + ' min para terminar a leitura' : ' · sem ritmo de leitura cadastrado'}</span>}
+            <span>{item.reasons.join(' · ') || 'Avanço do material prioritário'}</span>
+          </button>
+          <div className="rt-actions">
+            <button type="button" disabled={busy} onClick={() => onSelect(item.id)}>Registrar estudo</button>
+            <button type="button" disabled={busy} onClick={() => onOpen(item.id)}>Abrir aula</button>
+          </div>
+        </li>;
+      })}</ul>}
+    {plan.available > 0 && <p>{plan.available} min livres após as atividades sugeridas. Você pode ampliar uma sessão ou escolher outra fase.</p>}
   </section>;
 }

@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { parseBackup } from '../src/remnote/storage';
 import { attentionLessons } from '../src/study-attention';
 
-test('atenção inclui leitura concluída, exige amostra e ordena pelo desempenho real', () => {
+test('atenção inclui leitura concluída e poucas questões, mantendo acerto alto com amostra fora da fila', () => {
   const data = parseBackup({
     version: 1, baseId: 'base', globalPace: null, subjectPaces: {},
     lessons: { done: { totalPages: 10, readPages: 10, stars: 5 } },
@@ -18,8 +18,8 @@ test('atenção inclui leitura concluída, exige amostra e ordena pelo desempenh
   }, 'base');
   const subjects = new Map(['done', 'weak', 'almost', 'goal', 'few'].map((id) => [id, 'subject']));
   const rows = attentionLessons(data, subjects, 10);
-  assert.deepEqual(rows.map((row) => row.id), ['weak', 'done', 'almost']);
+  assert.deepEqual(rows.map((row) => row.id), ['done', 'few', 'weak', 'almost']);
   assert.equal(rows[0].band, 'red');
-  assert.equal(rows[2].band, 'yellow');
-  assert.equal(attentionLessons(data, subjects, 1)[0].id, 'few');
+  assert.equal(rows[3].band, 'yellow');
+  assert.equal(rows.find((row) => row.id === 'few')?.reason, 'Poucos exercícios cadastrados');
 });
