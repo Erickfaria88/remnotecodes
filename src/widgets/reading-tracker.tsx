@@ -1,4 +1,5 @@
-import { renderWidget, usePlugin, WidgetLocation, type RNPlugin } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation, type RNPlugin } from '@remnote/plugin-sdk';
+import { lessonRequestKey, type LessonDashboardRequest } from '../remnote/lesson-dashboard';
 import { DocumentProgress } from '../components/DocumentProgress';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { validPhase } from '../recommendations';
@@ -100,6 +101,19 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const [busy, setBusy] = useState(true);
   const action = useRef(false);
   const lessonEditor = useRef<HTMLElement>(null);
+  const handledRequest = useRef<string>();
+  const request = useTrackerPlugin((reactive) =>
+    reactive.storage.getSession<LessonDashboardRequest>(lessonRequestKey(baseId)), [baseId]);
+
+  useEffect(() => {
+    if (!isDashboard || !request?.lessonId || !request.token || !data || busy ||
+        handledRequest.current === request.token) return;
+    handledRequest.current = request.token;
+    setCollapsed(false);
+    setView('exercises');
+    selectResume(request.lessonId);
+    void plugin.storage.setSession(lessonRequestKey(baseId), null);
+  }, [request, data, busy, baseId, plugin]);
 
   useEffect(() => {
     if (selected) lessonEditor.current?.scrollIntoView({ block: 'nearest' });

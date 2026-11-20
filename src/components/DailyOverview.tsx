@@ -34,28 +34,29 @@ export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onR
     </section>
     <section aria-label="Aulas que precisam de atenção">
       <h3>Aulas que precisam de atenção</h3>
-      <label>Quantidade mínima de questões para esta consulta
+      <label>Referência de quantidade de questões
         <select value={minimum} onChange={(event) => setMinimum(event.target.value)}>
           {[1, 5, 10, 20, 30].map((value) => <option key={value} value={value}>{value} questões</option>)}
         </select>
       </label>
-      <p>Aulas abaixo de 80% de acerto. Menor percentual primeiro, seguido de importância e fase.</p>
-      {rows.length === 0 ? <p>Nenhuma aula atende a esse filtro.</p> : <ul>{rows.map((row) => {
+      <p>Sem exercícios, com poucas questões ou abaixo de 80% de acerto. Ordem por fase, importância e desempenho.
+        Estas são oportunidades para o plano de avanço abaixo.</p>
+      {rows.length === 0 ? <p>Nenhuma aula atende a esse filtro.</p> : <details><summary>Consultar aulas que precisam de atenção · {rows.length}</summary><ul>{rows.map((row) => {
         const name = titles.get(row.id)!;
         return <li key={row.id} className={'rt-row rt-attention-' + row.band}>
           <button className="rt-row-main" type="button" disabled={busy} onClick={() => onSelect(row.id)}>
             <strong>{name.title}</strong>
             <span>{name.subject}{row.phase ? ' · Fase ' + row.phase : ''}</span>
-            <span><strong>{row.percent} de acerto</strong> · {row.total} questões</span>
+            <span><strong>{row.total ? row.percent + ' de acerto' : 'Sem avaliação'}</strong> · {row.total} questões</span>
             <span>{row.correct} acertos · {row.incorrect} erros · {row.stars}/5 ★</span>
-            <span>{row.band === 'red' ? 'Prioridade de reforço' : 'Precisa consolidar'}</span>
+            <span>{row.reason}</span>
           </button>
           <div className="rt-actions">
             <button type="button" disabled={busy} onClick={() => onSelect(row.id)}>Registrar estudo</button>
             <button type="button" disabled={busy} onClick={() => onOpen(row.id)}>Abrir aula</button>
           </div>
         </li>;
-      })}</ul>}
+      })}</ul></details>}
       {few > 0 && <p>{few} {few === 1 ? 'aula com poucas questões para este filtro' : 'aulas com poucas questões para este filtro'}.</p>}
     </section>
   </>;

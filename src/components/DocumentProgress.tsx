@@ -1,7 +1,8 @@
 import { usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import { createRepository } from '../remnote/storage';
 import { documentMetrics } from '../document-metrics';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { openLessonDashboard } from '../remnote/lesson-dashboard';
 import { studySteps } from '../study-steps';
 
 
@@ -18,6 +19,8 @@ export function DocumentProgress({ location, paneId }: {
   paneId?: string;
 }) {
   const plugin = usePlugin();
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState('');
   useEffect(() => { window.dispatchEvent(new Event('reading-tracker-ready')); }, []);
   const metrics = useTrackerPlugin(async (reactive) => {
     try {
@@ -33,7 +36,8 @@ export function DocumentProgress({ location, paneId }: {
       if (!base?._id || !id) return null;
       const data = await createRepository(reactive.storage, base._id).load();
       const document = await reactive.rem.findOne(id);
-      return documentMetrics(data, id, document?.children ?? []);
+      return { ...documentMetrics(data, id, document?.children ?? []), id,
+        isLesson: !(document?.children ?? []).some((child) => data.lessons[child] || data.exercises[child]) };
     } catch (error) {
       console.error('Reading Tracker: progresso do documento', error);
       return null;
@@ -41,6 +45,13 @@ export function DocumentProgress({ location, paneId }: {
   }, [plugin, location, paneId]);
 
   if (!metrics || (metrics.percent === null && !metrics.exercise)) return null;
+  async function openDashboard() {
+    setOpening(true);
+    setOpenError('');
+    try { await openLessonDashboard(plugin, metrics!.id); }
+    catch (cause) { setOpenError(cause instanceof Error ? cause.message : 'Não foi possível abrir o dashboard.'); }
+    finally { setOpening(false); }
+  }
   return <section aria-label="Progresso de leitura" style={{
     padding: '4px 2px', font: '13px/1.35 system-ui, sans-serif', color: 'inherit',
   }}>
@@ -62,8 +73,18 @@ export function DocumentProgress({ location, paneId }: {
       {metrics.exercise && <li style={{
         padding: '1px 6px', border: '1px solid', borderRadius: 8,
         ...exerciseColors[metrics.exercise.band],
-      }}>{metrics.exercise.total} {metrics.exercise.total === 1 ? 'questão' : 'questões'} · {metrics.exercise.percent} de acerto</li>}
+      }}>{metrics.isLesson ? <button type="button" disabled={opening} onClick={() => void openDashboard()}
+        title="Registrar exercícios e progresso desta aula"
+        style={{ background: 'transparent', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
+        {metrics.exercise.total} {metrics.exercise.total === 1 ? 'questão' : 'questões'} · {metrics.exercise.percent} de acerto ↗
+      </button> : <>{metrics.exercise.total} questões · {metrics.exercise.percent} de acerto</>}</li>}
     </ul>}
+    {metrics.isLesson && <button type="button" disabled={opening} onClick={() => void openDashboard()}
+      style={{ marginTop: 6, padding: '4px 8px', border: '1px solid #d7dfed', borderRadius: 6,
+        background: '#fff', color: '#2651ba', cursor: 'pointer' }}>
+      {opening ? 'Abrindo…' : 'Registrar estudo desta aula ↗'}
+    </button>}
+    {openError && <p role="alert">{openError}</p>}
   </section>;
 }
 
