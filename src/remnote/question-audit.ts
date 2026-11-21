@@ -12,6 +12,9 @@ export interface AuditDraft {
   reviewTime?:ReviewTimeInput;
 }
 export const auditDraftKey=(baseId:string)=>'reading-tracker:audit-draft:'+encodeURIComponent(baseId);
+export function stableAuditRecovery(previous:AuditDraft,current:AuditDraft) {
+  return previous.phase==='summary'&&!!previous.endedAt&&JSON.stringify(previous.histories)===JSON.stringify(current.histories);
+}
 const leaseKey=(baseId:string)=>'reading-tracker:audit-lease:'+encodeURIComponent(baseId);
 export async function verifyAuditBase(plugin:RNPlugin,baseId:string) {
   if((await plugin.kb.getCurrentKnowledgeBaseData())._id!==baseId)throw new Error('A base ativa mudou. Reabra a base de origem para auditar.');
@@ -30,6 +33,7 @@ export function validDraft(value:unknown,baseId:string):value is AuditDraft {
     (d.lessonInfo===undefined||!!d.lessonInfo&&typeof d.lessonInfo==='object'&&Object.entries(d.lessonInfo).every(([id,info])=>validAuditId(id)&&info&&typeof info.title==='string'&&typeof info.subject==='string'&&validAuditId(info.subjectId))) &&
     ['running','summary'].includes(d.phase) && Array.isArray(d.cards) && d.cards.length<=2000 &&
     d.cards.every(c=>c && validAuditId(c.cardId) && typeof c.title==='string' && (c.remId===undefined||validAuditId(c.remId)) &&
+      (c.allowCardIdentity===undefined||typeof c.allowCardIdentity==='boolean') &&
       (c.lessonId===undefined||validAuditId(c.lessonId)) && (c.questionKey===undefined||validQuestionKey(c.questionKey)) &&
       (c.identityIssue===undefined||typeof c.identityIssue==='string') && (c.baseline===null || readHistory(c.baseline)!==null)) &&
     !!d.histories && typeof d.histories==='object' && !Array.isArray(d.histories) && Object.values(d.histories).every(h=>h===null||readHistory(h)!==null) &&
@@ -77,7 +81,8 @@ export async function prepareAudit(plugin:RNPlugin,baseId:string,id:string,cardI
       if(!questionKey)identityIssue=identityIssue || 'Sem link TEC nos ancestrais do cartão. O ícone de livro sozinho não identifica uma questão.';
       // Preserve the block's original owner for manual auditing/time entry;
       // identityIssue prevents automatic exercise selection when ancestry failed.
-      return {cardId,remId:card.remId,lessonId,title,questionKey,baseline,identityIssue};
+      const allowCardIdentity=reached&&!questionKey&&/^\s*[📖📚📘📗📙📕]/u.test(title)&&identityIssue==='Sem link TEC nos ancestrais do cartão. O ícone de livro sozinho não identifica uma questão.';
+      return {cardId,remId:card.remId,lessonId,title,questionKey,baseline,identityIssue,allowCardIdentity};
     }));
     cards.push(...rows);rows.forEach(row=>histories[row.cardId]=row.baseline);
   }

@@ -6,11 +6,13 @@ export interface AuditCard {
   cardId: string; remId?: string; lessonId?: string; title: string;
   questionKey?: string; identityIssue?: string;
   baseline: Repetition[] | null;
+  allowCardIdentity?:boolean;
 }
 export interface AuditRow {
   id: string; cardIds: string[]; questionKey?: string; lessonId?: string; title: string;
   correct: boolean | null; at?: number; issue: string; responses: number;
   include: boolean; manual: boolean;
+  cardFallbackEligible?:boolean;recordByCard?:boolean;
 }
 export interface AuditEntry {
   questionKey: string; lessonId: string; day: string; correct: boolean; at: number; origin: 'history' | 'manual';
@@ -34,6 +36,12 @@ export function outcome(score: number): boolean | null {
   return score === 0 ? false : [0.5,1,1.5].includes(score) ? true : null;
 }
 const signature = (row: Repetition) => JSON.stringify([row.date,row.score,row.responseTime,row.scheduled,row.isCram]);
+function cardIdentityAllowed(card:AuditCard) {
+  if(card.allowCardIdentity!==undefined)return card.allowCardIdentity;
+  // Compatibility for snapshots created before this explicit flag existed.
+  return !!card.remId&&!!card.lessonId&&/^\s*[📖📚📘📗📙📕]/u.test(card.title)&&
+    card.identityIssue==='Sem link TEC nos ancestrais do cartão. O ícone de livro sozinho não identifica uma questão.';
+}
 export function historyDelta(before: Repetition[] | null, after: Repetition[] | null) {
   if (!before || !after) return { entries: [] as Repetition[], issue: 'Histórico indisponível; confira manualmente.' };
   const remaining = new Map<string,number>();
@@ -72,10 +80,13 @@ export function auditRows(cards: AuditCard[], histories: Record<string,Repetitio
     const earliest=group.entries.filter(r=>r.date===first?.date);
     if(new Set(earliest.map(r=>outcome(r.score))).size>1)group.issues.push('Avaliações conflitantes no mesmo instante.');
     const issue=[...new Set(group.issues)].join(' ');
+    const source=group.cards[0];
+    const cardFallbackEligible=!!first && group.cards.length===1 && cardIdentityAllowed(source) && !source.questionKey &&
+      !!source.lessonId && !group.issues.some(message=>message!==source.identityIssue);
     return {id,cardIds:group.cards.map(c=>c.cardId),questionKey:group.cards[0].questionKey,
       lessonId:lessons.length===1?lessons[0]:undefined,title:group.cards[0].title,
       correct:first?outcome(first.score):null,at:first?.date,issue,responses:group.entries.length,
-      include:!!first && !issue && !!group.cards[0].questionKey,manual:false};
+      include:!!first && !issue && !!group.cards[0].questionKey,manual:false,cardFallbackEligible};
     });
   });
 }
@@ -92,10 +103,37 @@ export function validAuditBatch(value: unknown): value is AuditBatch {
 }
 export function approvedEntries(rows: AuditRow[], now = Date.now()): AuditEntry[] {
   return rows.filter(row=>row.include).map(row=>{
-    if(!validQuestionKey(row.questionKey) || !validAuditId(row.lessonId) || row.correct===null || row.issue && !row.manual) throw new Error('Resolva as pendências dos itens selecionados antes de confirmar.');
+    if(!validQuestionKey(row.questionKey) || !validAuditId(row.lessonId) || row.correct===null || row.issue && !row.manual && !(row.recordByCard&&row.cardFallbackEligible)) throw new Error('Resolva as pendências dos itens selecionados antes de confirmar.');
     const at=row.at??now;
     return {questionKey:row.questionKey,lessonId:row.lessonId,correct:row.correct,at,day:studyDay(0,new Date(at)),origin:row.manual?'manual':'history'};
   });
+}
+export function simplifyAuditRows(rows:AuditRow[],cards:AuditCard[]) {
+  const sources=new Map(cards.map(c=>[c.cardId,c]));
+  const merged=new Map<string,AuditRow>();
+  for(const original of rows) {
+    let row=original;
+    if(row.cardFallbackEligible) {
+      const source=sources.get(row.cardIds[0]);const rem=source?.remId??row.cardIds[0];
+      const day=studyDay(0,new Date(row.at!));
+      const earlier=cards.some(c=>(c.remId??c.cardId)===rem&&c.baseline?.some(r=>outcome(r.score)!==null&&studyDay(0,new Date(r.date))===day));
+      row={...row,questionKey:'rem:'+rem,recordByCard:!earlier,include:!earlier,
+        ...(earlier?{issue:'Este tópico já tinha avaliação no dia; confira a primeira tentativa nos detalhes.',cardFallbackEligible:false}:{})};
+    }
+    const key=row.recordByCard?row.questionKey+'|'+studyDay(0,new Date(row.at!)):row.id;
+    const previous=merged.get(key);
+    if(previous&&row.recordByCard) {
+      const first=previous.at!<=row.at!?previous:row;
+      const conflict=previous.at===row.at&&previous.correct!==row.correct;
+      merged.set(key,{...first,cardIds:[...new Set([...previous.cardIds,...row.cardIds])],responses:previous.responses+row.responses,
+        ...(conflict?{include:false,recordByCard:false,cardFallbackEligible:false,issue:'Avaliações conflitantes no mesmo instante.'}:{})});
+    }else merged.set(key,row);
+  }
+  return [...merged.values()];
+}
+export function selectedAuditRows(rows:AuditRow[],lessonIds:string[],known:Set<string>) {
+  return rows.filter(row=>row.include&&row.correct!==null&&!!row.lessonId&&lessonIds.includes(row.lessonId)&&
+    !!row.questionKey&&!known.has(studyDay(0,new Date(row.at??Date.now()))+'|'+row.questionKey));
 }
 export function countedQuestions(batches: Record<string,AuditBatch>) {
   return new Set(Object.values(batches).flatMap(b=>b.entries.map(e=>e.day+'|'+e.questionKey)));

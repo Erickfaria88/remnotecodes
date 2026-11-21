@@ -1,7 +1,7 @@
 import { AppEvents, usePlugin } from '@remnote/plugin-sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { approvedEntries, auditRows, countedQuestions, type AuditRow } from '../question-audit';
-import { auditDraftKey, claimAudit, prepareAudit, refreshAudit, releaseAudit, verifyAuditBase, type AuditDraft } from '../remnote/question-audit';
+import { approvedEntries, auditRows, countedQuestions, simplifyAuditRows, selectedAuditRows, type AuditRow } from '../question-audit';
+import { auditDraftKey, claimAudit, prepareAudit, refreshAudit, releaseAudit, verifyAuditBase, stableAuditRecovery, type AuditDraft } from '../remnote/question-audit';
 import { createRepository, type Backup } from '../remnote/storage';
 import { studyDay } from '../resume';
 import {defaultReviewTime,reviewedCardCounts,reviewSessions,type ReviewLessonInfo,type ReviewTimeInput} from '../review-time';
@@ -35,9 +35,9 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
       let next:AuditDraft;
       if(recovered) {
         next=await refreshAudit(plugin,recovered,owner.current);
-        const issues=Object.fromEntries(next.cards.map(c=>[c.cardId,'Auditoria recuperada após interrupção. Confira este item manualmente.']));
+        const issues=stableAuditRecovery(recovered,next)?next.issues:Object.fromEntries(next.cards.map(c=>[c.cardId,'Auditoria recuperada após interrupção ou alteração do histórico. Confira este item manualmente.']));
         next={...next,phase:'summary',endedAt:recovered.endedAt??Date.now(),issues};
-        next.rows=auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,issues);
+        next.rows=simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,issues),next.cards);
         if(live)setRows(next.rows);
       }else next=await prepareAudit(plugin,baseId,id.current,cards,owners,owner.current);
       const lessonIds=[...new Set(next.cards.flatMap(c=>c.lessonId?[c.lessonId]:[]))];
@@ -97,7 +97,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
       setError(e instanceof Error?e.message:'Não foi possível conferir o histórico final.');
     }
     next={...next,phase:'summary',endedAt:finishedAt};
-    next.rows=auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,next.issues);
+    next.rows=simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,next.issues),next.cards);
     const counts=reviewedCardCounts(next.cards,next.histories,next.startedAt,finishedAt);
     next.reviewTime=defaultReviewTime(next.practiceStartedAt,finishedAt,counts);setTimeInput(next.reviewTime);
     publish(next);setRows(next.rows);
@@ -149,11 +149,13 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
       if(includeQuestions&&JSON.stringify(fresh.histories)!==JSON.stringify(current.current.histories)) {
         const issues=Object.fromEntries(fresh.cards.map(c=>[c.cardId,'O histórico mudou durante a auditoria. Confira novamente antes de registrar.']));
         const next={...fresh,issues,endedAt:current.current.endedAt??Date.now()};
-        next.rows=auditRows(next.cards,next.histories,next.startedAt,next.endedAt,issues);
+        next.rows=simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt,issues),next.cards);
         publish(next);setRows(next.rows);
         throw new Error('O histórico mudou. O resumo foi atualizado e exige nova conferência.');
       }
-      const entries=includeQuestions?approvedEntries(rows):[];
+      const latest=await repo.load();
+      const selected=selectedAuditRows(rows,timeInput.lessonIds,countedQuestions(latest.auditBatches??{}));
+      const entries=includeQuestions?approvedEntries(selected):[];
       const counts=reviewedCardCounts(current.current.cards,current.current.histories,current.current.startedAt,current.current.endedAt??Date.now());
       const sessions=reviewSessions(id.current,timeInput,counts,current.current.lessonInfo??{});
       if(!entries.length&&!sessions.length)throw new Error('Informe o tempo de revisão ou selecione questões conferidas.');
@@ -192,50 +194,54 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
 export function QuestionAuditSummary({audit,titles}:{audit:ReturnType<typeof useQuestionAudit>;titles:Map<string,{title:string;subject:string}>}) {
   const {rows,setRows,data,working}=audit;
   const known=countedQuestions(data?.auditBatches??{});
-  const counted=(row:AuditRow)=>!!row.questionKey && known.has(studyDay(0,new Date(row.at??Date.now()))+'|'+row.questionKey);
-  const eligible=rows.filter(r=>r.include&&!counted(r));
+  const counted=(row:AuditRow)=>!!row.questionKey&&known.has(studyDay(0,new Date(row.at??Date.now()))+'|'+row.questionKey);
+  const eligible=selectedAuditRows(rows,audit.timeInput.lessonIds,known);
+  const ids=new Set(eligible.map(r=>r.id));
+  const pending=rows.filter(r=>!ids.has(r.id));
   const totals=new Map<string,{correct:number;incorrect:number}>();
-  for(const row of eligible)if(row.lessonId && row.correct!==null) {
-    const sum=totals.get(row.lessonId)??{correct:0,incorrect:0};sum.correct+=Number(row.correct);sum.incorrect+=Number(!row.correct);totals.set(row.lessonId,sum);
-  }
-  const edit=(id:string,changes:Partial<AuditRow>)=>setRows(previous=>previous.map(r=>r.id===id?{...r,...changes,manual:true,include:false,at:r.at??Date.now()}:r));
-  const invalid=eligible.some(r=>!r.questionKey||!r.lessonId||r.correct===null||r.issue&&!r.manual);
+  for(const row of eligible)if(row.lessonId&&row.correct!==null){const sum=totals.get(row.lessonId)??{correct:0,incorrect:0};sum.correct+=Number(row.correct);sum.incorrect+=Number(!row.correct);totals.set(row.lessonId,sum);}
+  const correct=eligible.filter(r=>r.correct).length;
+  const incorrect=eligible.length-correct;
+  const byCard=eligible.filter(r=>r.recordByCard).length;
+  const edit=(id:string,changes:Partial<AuditRow>)=>setRows(previous=>previous.map(r=>r.id===id?{...r,...changes,manual:true,recordByCard:false,include:false,at:r.at??Date.now()}:r));
+  const invalid=eligible.some(r=>!r.questionKey||!r.lessonId||r.correct===null||r.issue&&!r.manual&&!(r.recordByCard&&r.cardFallbackEligible));
   const time=reviewTimePreview(audit.draft,audit.timeInput);
+  const totalSeconds=time.sessions.reduce((sum,s)=>sum+s.seconds,0);
   const savedSeconds=Object.values(data?.sessions??{}).filter(s=>s.auditId===audit.auditId).reduce((sum,s)=>sum+s.seconds,0);
-  if(audit.savedCount!==undefined)return <div className="rt-audit-summary"><h2>Revisão já registrada</h2><p>{audit.savedCount} questões foram somadas por este bloco · {formatDuration(savedSeconds)} de tempo registrado. Não repita o lançamento manualmente. Os detalhes estão no histórico de tempo e em Exercícios → Auditorias confirmadas.</p><button type="button" disabled={working} onClick={()=>void audit.discard()}>Fechar revisão registrada</button></div>;
+  if(audit.savedCount!==undefined)return <div className="rt-audit-summary"><h2>Revisão já registrada</h2><p>{audit.savedCount} respostas somadas · {formatDuration(savedSeconds)} de tempo registrado. Não repita o lançamento manualmente.</p><button type="button" disabled={working} onClick={()=>void audit.discard()}>Fechar revisão registrada</button></div>;
+  function detail(row:AuditRow){return <details className="rt-row rt-audit-row" key={row.id}>
+    <summary>{row.questionKey??'Sem identificação'} · {row.correct===null?'sem resposta confirmada':row.correct?'acerto':'erro'}{counted(row)?' · já registrada hoje':''}</summary>
+    <p>{row.title}</p><p>{row.responses} avaliações detectadas; usa a primeira válida.</p>
+    {row.issue&&<p>{row.recordByCard?'Questão 📖 sem link TEC: identificada pelo tópico do cartão.':row.issue}</p>}
+    <label>Identificação<input value={row.questionKey??''} placeholder="tec:2417266" onChange={e=>edit(row.id,{questionKey:e.target.value.trim()})}/></label>
+    {!row.questionKey&&<button type="button" onClick={()=>edit(row.id,{questionKey:'rem:'+row.cardIds[0]})}>Identificar pelo cartão após conferência manual</button>}
+    <label>Aula<select value={row.lessonId??''} onChange={e=>edit(row.id,{lessonId:e.target.value||undefined})}><option value="">Selecione a aula</option>
+      {row.lessonId&&!titles.has(row.lessonId)&&<option value={row.lessonId}>Aula original · {row.lessonId}</option>}
+      {[...titles].map(([id,t])=><option key={id} value={id}>{t.subject} · {t.title}</option>)}</select></label>
+    <label>Resultado<select value={row.correct===null?'':row.correct?'correct':'incorrect'} onChange={e=>edit(row.id,{correct:e.target.value===''?null:e.target.value==='correct'})}>
+      <option value="">Não confirmado / não respondido</option><option value="correct">Acerto</option><option value="incorrect">Erro</option></select></label>
+    {row.issue&&!row.manual&&!row.recordByCard&&<button type="button" onClick={()=>edit(row.id,{})}>Conferi este item manualmente</button>}
+    <label className="rt-pareto-toggle"><input type="checkbox" disabled={counted(row)||!!row.issue&&!row.manual&&!(row.recordByCard&&row.cardFallbackEligible)} checked={row.include&&!counted(row)}
+      onChange={e=>setRows(previous=>previous.map(r=>r.id===row.id?{...r,include:e.target.checked}:r))}/> Incluir no registro</label>
+  </details>;}
   return <div className="rt-audit-summary">
     <h2>Registrar revisão do bloco</h2>
-    <p>Os exercícios ainda não foram alterados. Esqueci = erro; Difícil, Bom e Fácil = acerto. A primeira resposta válida da questão no dia é a referência; reapresentações não viram novas questões.</p>
-    <p>O rascunho fica somente nesta máquina até confirmar ou descartar. Descartar não desfaz as avaliações já enviadas ao algoritmo do RemNote.</p>
-    {audit.uncertain&&<div role="alert"><p>A confirmação da gravação falhou ou está pendente. Não faça lançamento manual até verificar se o bloco foi salvo.</p><button type="button" disabled={working} onClick={()=>void audit.verifyCommit()}>Verificar se o bloco foi gravado</button></div>}
-    {audit.draft&&<ReviewTimeForm draft={audit.draft} value={audit.timeInput} onChange={audit.setTimeInput} disabled={working||audit.uncertain}/>}
-    <div className="rt-exam-grid">{[...totals].map(([id,sum])=><article className="rt-row" key={id}><strong>{titles.get(id)?.title??id}</strong>
-      <p>{sum.correct+sum.incorrect} questões · {sum.correct} acertos · {sum.incorrect} erros · {(100*sum.correct/(sum.correct+sum.incorrect)).toLocaleString('pt-BR',{maximumFractionDigits:2})}%</p></article>)}</div>
-    <p>{eligible.length} itens selecionados · {rows.filter(counted).length} já registrados hoje · {rows.filter(r=>!r.include&&!counted(r)).length} não selecionados. Conferir este resumo é obrigatório antes de somar.</p>
-    <details><summary>Resumo para copiar e registrar manualmente</summary><textarea readOnly rows={Math.max(3,totals.size+1)} aria-label="Resumo copiável"
-      value={[...totals].map(([id,sum])=>(titles.get(id)?.title??id)+': '+(sum.correct+sum.incorrect)+' questões; '+sum.correct+' acertos; '+sum.incorrect+' erros.').join('\n')||'Nenhum item selecionado.'}/></details>
-    <fieldset disabled={working||audit.uncertain} className="rt-audit-items"><details open><summary>Auditar questões e pendências ({rows.length})</summary>
-      {rows.map(row=><details className="rt-row rt-audit-row" key={row.id}>
-        <summary>{row.questionKey??'Sem identificação'} · {row.correct===null?'sem resposta confirmada':row.correct?'acerto':'erro'}{row.issue?' · conferir':''}{counted(row)?' · já registrada hoje':''}</summary>
-        <p>{row.title}</p><p>{row.responses} avaliações detectadas neste bloco; a primeira válida é usada.</p>
-        {row.issue&&<p role="alert">{row.issue}</p>}
-        {row.manual&&<p>Este item foi conferido ou ajustado manualmente.</p>}
-        <label>Identificação da questão<input disabled={working} value={row.questionKey??''} placeholder="tec:2417266" onChange={e=>edit(row.id,{questionKey:e.target.value.trim()})}/></label>
-        {!row.questionKey&&<button type="button" disabled={working} onClick={()=>edit(row.id,{questionKey:'rem:'+row.cardIds[0]})}>Identificar pelo cartão após conferência manual</button>}
-        <p>Prefira o número TEC para agrupar cópias da mesma questão. O ID do cartão não permite reconhecer cópias em outros documentos.</p>
-        <label>Aula<select disabled={working} value={row.lessonId??''} onChange={e=>edit(row.id,{lessonId:e.target.value||undefined})}><option value="">Selecione a aula correta</option>
-          {row.lessonId&&!titles.has(row.lessonId)&&<option value={row.lessonId}>Aula original · {row.lessonId}</option>}
-          {[...titles].map(([id,title])=><option key={id} value={id}>{title.subject} · {title.title}</option>)}</select></label>
-        <label>Resultado<select disabled={working} value={row.correct===null?'':row.correct?'correct':'incorrect'} onChange={e=>edit(row.id,{correct:e.target.value===''?null:e.target.value==='correct'})}>
-          <option value="">Não confirmado / não respondido</option><option value="correct">Acerto</option><option value="incorrect">Erro</option></select></label>
-        {row.issue&&!row.manual&&<button type="button" disabled={working} onClick={()=>edit(row.id,{})}>Conferi este item manualmente</button>}
-        <label className="rt-pareto-toggle"><input type="checkbox" disabled={working||counted(row)||!!row.issue&&!row.manual}
-          checked={row.include&&!counted(row)} onChange={e=>setRows(previous=>previous.map(r=>r.id===row.id?{...r,include:e.target.checked}:r))}/> Incluir na gravação</label>
-      </details>)}
-    </details></fieldset>
-    <p>Se já lançou estas questões manualmente, não as inclua novamente. Resultados não identificados com segurança nunca são selecionados automaticamente.</p>
-    <div className="rt-actions"><button className="rt-primary" type="button" disabled={working||audit.uncertain||!!time.error||!eligible.length&&!time.sessions.length||invalid} onClick={()=>void audit.confirm()}>{working?'Aguarde…':'Salvar revisão e questões selecionadas'}</button>
+    <p>Esqueci = erro · Difícil, Bom ou Fácil = acerto. Confira os totais e salve.</p>
+    {audit.uncertain&&<div role="alert"><p>A gravação precisa ser verificada antes de outro lançamento.</p><button type="button" disabled={working} onClick={()=>void audit.verifyCommit()}>Verificar se o bloco foi gravado</button></div>}
+    {audit.draft&&<ReviewTimeForm draft={audit.draft} value={audit.timeInput} onChange={audit.setTimeInput} disabled={working||audit.uncertain} results={totals}/>}
+    <section className="rt-confirm rt-block-total" aria-label="Total do bloco"><h3>Total do bloco</h3><strong>{correct} acertos · {incorrect} erros · {eligible.length} respostas</strong>
+      <p>{eligible.length?(correct/eligible.length*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'% de acerto':'Nenhuma resposta selecionada'}{totalSeconds?' · '+formatDuration(totalSeconds)+' de revisão':''}</p>
+    </section>
+    {!!byCard&&<p className="rt-audit-notice">{byCard} respostas de questões 📖 sem link TEC identificadas pelo cartão. Cópias em outros tópicos não podem ser agrupadas automaticamente.</p>}
+    <div className="rt-actions"><button className="rt-primary" type="button" disabled={working||audit.uncertain||!!time.error||!eligible.length&&!time.sessions.length||invalid} onClick={()=>void audit.confirm()}>{working?'Aguarde…':'Salvar revisão e resultados'}</button>
       <button type="button" disabled={working||audit.uncertain||!!time.error||!time.sessions.length} onClick={()=>void audit.confirm(false)}>Salvar somente o tempo</button>
       <button type="button" disabled={working||audit.uncertain} onClick={()=>void audit.discard()}>Descartar sem registrar</button></div>
+    <fieldset disabled={working||audit.uncertain} className="rt-audit-items">
+      <details><summary>Detalhes das respostas selecionadas ({eligible.length})</summary>{eligible.map(detail)}</details>
+      <details><summary>Pendências e itens fora do registro ({pending.length})</summary><p>Não entram nos totais: respostas sem confirmação, questões já registradas no dia e itens excluídos. Abra apenas se quiser conferir.</p>{pending.map(detail)}</details>
+    </fieldset>
+    <details><summary>Resumo para copiar e registrar manualmente</summary><textarea readOnly rows={Math.max(3,totals.size+2)} aria-label="Resumo copiável"
+      value={[...[...totals].map(([id,sum])=>(titles.get(id)?.title??id)+': '+sum.correct+' acertos; '+sum.incorrect+' erros.'),'Total: '+correct+' acertos; '+incorrect+' erros.'].join('\n')}/></details>
+    <details><summary>Regras de contagem</summary><p>Usa a primeira resposta válida da questão no dia; reapresentações não aumentam o total. Questões TEC são agrupadas pelo número. Questões 📖 sem link usam o tópico do cartão. Itens incertos ficam fora até conferência opcional. Se já lançou estas questões manualmente, não as registre novamente. Descartar não desfaz avaliações enviadas ao RemNote.</p></details>
   </div>;
 }
