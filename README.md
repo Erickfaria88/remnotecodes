@@ -226,3 +226,9 @@ Respostas sem confirmação, itens excluídos e questões já registradas no dia
 Para questões com ícone de livro no início do texto (por exemplo 📖), avaliação de acerto/erro confirmada no histórico e aula de origem confirmada, a ausência de link TEC deixa de exigir auditoria individual. Elas podem ser registradas pelo ID do tópico do cartão, com indicação dessa origem no resumo. Cartões do mesmo tópico usam a primeira resposta válida; cópias em tópicos diferentes sem link TEC não podem ser identificadas como a mesma questão. Flashcards comuns sem identificação, históricos alterados, respostas conflitantes e avaliações incertas continuam fora da seleção automática. Quando existe link TEC, o número permanece a identificação preferida.
 
 Um rascunho já finalizado cujo histórico continua inalterado mantém os resultados confirmados ao ser reaberto. Interrupção sem finalização ou alteração posterior do histórico exige conferência opcional dos itens afetados. O formato de armazenamento permanece 4.
+
+## Saída sempre disponível · versão 0.1.22
+
+O botão **Voltar ao plano** fica sempre visível no topo da prática e do resumo, independentemente de pendências ou validação. Ele volta sem registrar exercícios ou tempo e mantém o rascunho local para recuperar depois. A saída não espera indefinidamente por uma chamada do SDK. Se houver uma gravação já em andamento, confira o rascunho/recibo antes de lançar manualmente os mesmos resultados.
+
+O resumo agora tem rolagem própria e mantém os controles de ação acessíveis. A seleção de respostas usa a mesma regra de validade na prévia e na gravação: itens incertos, com identificações inválidas ou ainda não conferidos ficam na seção recolhida, sem bloquear o salvamento das respostas válidas. Consultas que terminam depois de fechar a tela não devem reabrir nem regravar o rascunho abandonado. O formato dos dados permanece 4.

@@ -103,10 +103,15 @@ export function validAuditBatch(value: unknown): value is AuditBatch {
 }
 export function approvedEntries(rows: AuditRow[], now = Date.now()): AuditEntry[] {
   return rows.filter(row=>row.include).map(row=>{
-    if(!validQuestionKey(row.questionKey) || !validAuditId(row.lessonId) || row.correct===null || row.issue && !row.manual && !(row.recordByCard&&row.cardFallbackEligible)) throw new Error('Resolva as pendências dos itens selecionados antes de confirmar.');
+    if(!recordableAuditRow(row)) throw new Error('Resolva as pendências dos itens selecionados antes de confirmar.');
     const at=row.at??now;
-    return {questionKey:row.questionKey,lessonId:row.lessonId,correct:row.correct,at,day:studyDay(0,new Date(at)),origin:row.manual?'manual':'history'};
+    return {questionKey:row.questionKey!,lessonId:row.lessonId!,correct:row.correct!,at,day:studyDay(0,new Date(at)),origin:row.manual?'manual':'history'};
   });
+}
+export function recordableAuditRow(row:AuditRow) {
+  return validQuestionKey(row.questionKey)&&validAuditId(row.lessonId)&&typeof row.correct==='boolean'&&
+    (row.at===undefined||Number.isSafeInteger(row.at)&&row.at>0)&&
+    (!row.issue||row.manual||!!row.recordByCard&&!!row.cardFallbackEligible);
 }
 export function simplifyAuditRows(rows:AuditRow[],cards:AuditCard[]) {
   const sources=new Map(cards.map(c=>[c.cardId,c]));
@@ -132,8 +137,8 @@ export function simplifyAuditRows(rows:AuditRow[],cards:AuditCard[]) {
   return [...merged.values()];
 }
 export function selectedAuditRows(rows:AuditRow[],lessonIds:string[],known:Set<string>) {
-  return rows.filter(row=>row.include&&row.correct!==null&&!!row.lessonId&&lessonIds.includes(row.lessonId)&&
-    !!row.questionKey&&!known.has(studyDay(0,new Date(row.at??Date.now()))+'|'+row.questionKey));
+  return rows.filter(row=>row.include&&recordableAuditRow(row)&&lessonIds.includes(row.lessonId!)&&
+    !known.has(studyDay(0,new Date(row.at??Date.now()))+'|'+row.questionKey));
 }
 export function countedQuestions(batches: Record<string,AuditBatch>) {
   return new Set(Object.values(batches).flatMap(b=>b.entries.map(e=>e.day+'|'+e.questionKey)));

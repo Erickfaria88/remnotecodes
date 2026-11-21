@@ -1,10 +1,11 @@
 import { Queue } from '@remnote/plugin-sdk';
 import { createPortal } from 'react-dom';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { QuestionAuditSummary, useQuestionAudit } from './QuestionAudit';
 import type { Backup } from '../remnote/storage';
 import type { AuditDraft } from '../remnote/question-audit';
 import type {ReviewLessonInfo} from '../review-time';
+import {ReviewToolbar} from './ReviewToolbar';
 
 /** Owns only the plugin iframe; never modifies the RemNote host document. */
 export function ReviewPractice({ cards, onExit, baseId, owners, titles, onSaved, recovered }: {
@@ -12,7 +13,6 @@ export function ReviewPractice({ cards, onExit, baseId, owners, titles, onSaved,
   titles:Map<string,ReviewLessonInfo>;onSaved:(data:Backup)=>void;recovered?:AuditDraft;
 }) {
   const audit=useQuestionAudit({baseId,cards,owners,onExit,onSaved,recovered,titles});
-  const exit = useRef<HTMLButtonElement>(null);
   const [host] = useState(() => document.querySelector('.reading-tracker-panel')?.parentElement ?? document.body);
   const [height, setHeight] = useState(480);
   useLayoutEffect(() => {
@@ -29,19 +29,17 @@ export function ReviewPractice({ cards, onExit, baseId, owners, titles, onSaved,
     document.documentElement.classList.add('rt-reviewing');
     resize();
     window.addEventListener('resize', resize);
-    exit.current?.focus({ preventScroll: true });
+    host.querySelector<HTMLButtonElement>('[data-action="leave-review"]')?.focus({ preventScroll: true });
     return () => {
       document.documentElement.classList.remove('rt-reviewing');
       window.removeEventListener('resize', resize);
       previous?.focus({ preventScroll: true });
     };
   }, []);
-  return createPortal(<section className="reading-tracker-panel rt-review-practice" aria-label="Resolver flashcards">
-    <header className="rt-review-toolbar">
-      <strong>{audit.draft?.phase==='summary'?'Auditoria do bloco':'Revisão de flashcards'}</strong>
-      <button ref={exit} type="button" disabled={audit.working} onClick={()=>audit.draft ? void audit.finish() : onExit()}
-        hidden={audit.draft?.phase==='summary'} aria-label="Encerrar a prática e conferir os resultados">{audit.draft?'Encerrar e auditar':'← Voltar ao plano'}</button>
-    </header>
+  return createPortal(<section className="reading-tracker-panel rt-review-practice" aria-label="Resolver flashcards"
+    style={audit.draft?.phase==='summary'?{maxHeight:Math.max(280,height+56),overflowY:'auto'}:undefined}>
+    <ReviewToolbar summary={audit.draft?.phase==='summary'} running={audit.draft?.phase==='running'} working={audit.working}
+      onLeave={()=>void audit.leave()} onFinish={()=>void audit.finish()}/>
     {audit.error&&<p role="alert">{audit.error}</p>}
     {!audit.draft&&<p>Preparando a identificação das questões e a leitura inicial dos históricos…</p>}
     {audit.working&&<p role="status">Conferindo os históricos; aguarde…</p>}

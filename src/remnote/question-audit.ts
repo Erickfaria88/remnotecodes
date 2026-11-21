@@ -16,6 +16,15 @@ export function stableAuditRecovery(previous:AuditDraft,current:AuditDraft) {
   return previous.phase==='summary'&&!!previous.endedAt&&JSON.stringify(previous.histories)===JSON.stringify(current.histories);
 }
 const leaseKey=(baseId:string)=>'reading-tracker:audit-lease:'+encodeURIComponent(baseId);
+async function assertAuditOwner(plugin:RNPlugin,baseId:string,id:string,owner:string) {
+  const lease=await plugin.storage.getSession<{id:string;owner:string}>(leaseKey(baseId));
+  if(lease?.id!==id||lease.owner!==owner)throw new Error('Esta tela de revisão já foi encerrada.');
+}
+export async function keepAuditDraft(plugin:RNPlugin,draft:AuditDraft) {
+  const existing=await plugin.storage.getLocal<AuditDraft>(auditDraftKey(draft.baseId));
+  if(existing&&existing.id!==draft.id)throw new Error('Existe outro rascunho nesta base. O anterior foi preservado.');
+  await plugin.storage.setLocal(auditDraftKey(draft.baseId),draft);
+}
 export async function verifyAuditBase(plugin:RNPlugin,baseId:string) {
   if((await plugin.kb.getCurrentKnowledgeBaseData())._id!==baseId)throw new Error('A base ativa mudou. Reabra a base de origem para auditar.');
 }
@@ -88,7 +97,8 @@ export async function prepareAudit(plugin:RNPlugin,baseId:string,id:string,cardI
   }
   await verifyAuditBase(plugin,baseId);
   const draft:AuditDraft={version:1,id,baseId,startedAt,cards,histories,issues:{},phase:'running'};
-  await plugin.storage.setLocal(auditDraftKey(baseId),draft);
+  await assertAuditOwner(plugin,baseId,id,owner);
+  await keepAuditDraft(plugin,draft);
   return draft;
 }
 export async function refreshAudit(plugin:RNPlugin,draft:AuditDraft,owner=draft.id):Promise<AuditDraft> {
@@ -103,6 +113,7 @@ export async function refreshAudit(plugin:RNPlugin,draft:AuditDraft,owner=draft.
   }
   const next={...draft,histories,issues};
   await verifyAuditBase(plugin,draft.baseId);
-  await plugin.storage.setLocal(auditDraftKey(draft.baseId),next);
+  await assertAuditOwner(plugin,draft.baseId,draft.id,owner);
+  await keepAuditDraft(plugin,next);
   return next;
 }
