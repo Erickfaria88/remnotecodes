@@ -1,0 +1,25 @@
+{
+  "id": "reading-tracker",
+  "name": "Reading Tracker",
+  "author": "Reading Tracker",
+  "description": "Acompanhe a leitura de PDFs externos por aula.",
+  "version": {
+    "major": 0,
+    "minor": 1,
+    "patch": 22
+  },
+  "manifestVersion": 1,
+  "requestNative": false,
+  "enableOnMobile": false,
+  "requiredScopes": [
+    {
+      "type": "All",
+      "level": "ReadCreateModify"
+    },
+    {
+      "type": "KnowledgeBaseInfo",
+      "level": "Read"
+    }
+  ],
+  "repoUrl": "http://localhost:8080"
+}
