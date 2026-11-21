@@ -5,6 +5,7 @@ import { calendarReminder, googleCalendarUrl, studyDay, validStudyDay, type Read
 
 import { studySteps, type StudyStep } from '../study-steps';
 import { incidenceStars, validIncidence } from '../pareto';
+import { parseDuration, sessionCategories, type SessionInput } from '../study-sessions';
 
 interface Props {
   title: string;
@@ -15,7 +16,7 @@ interface Props {
   lessonId: string;
   onSave: (progress: Progress | undefined, resumeOn: string | null, stars: number | null,
     steps: StudyStep[], exercises?: ExerciseResult, replaceExercises?: boolean,
-    incidence?: number | null, incidenceTopic?: string) => Promise<void>;
+    incidence?: number | null, incidenceTopic?: string, session?: SessionInput) => Promise<void>;
 }
 
 export function LessonForm({ title, progress, exercises, busy, calendarId, lessonId, onSave }: Props) {
@@ -26,6 +27,14 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
   const [correctingExercises, setCorrectingExercises] = useState(false);
   const [incidence, setIncidence] = useState(progress?.incidence?.toString() ?? '');
   const [incidenceTopic, setIncidenceTopic] = useState(progress?.incidenceTopic ?? '');
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [duration, setDuration] = useState('');
+  const [sessionDay, setSessionDay] = useState(studyDay);
+  const [category, setCategory] = useState<SessionInput['category']>('theory');
+  const [counted, setCounted] = useState(true);
+  const [note, setNote] = useState('');
+  const [firstPage, setFirstPage] = useState('');
+  const [lastPage, setLastPage] = useState('');
   const [error, setError] = useState('');
   const [day, setDay] = useState(progress?.resumeOn ?? '');
   const [stars, setStars] = useState(progress?.stars?.toString() ?? '');
@@ -74,13 +83,34 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    let session: SessionInput | undefined;
+    try {
+      if (duration.trim()) {
+        if (!validStudyDay(sessionDay) || sessionDay > studyDay()) throw new Error('Escolha hoje ou uma data anterior para o estudo.');
+        session = { id: sessionId, seconds: parseDuration(duration.trim()), day: sessionDay, category, counted, note };
+      } else if (firstPage || lastPage || note) throw new Error('Informe o tempo da sessão para salvar o trecho e a observação.');
+      if (firstPage || lastPage) {
+        const start = Number(firstPage);
+        const end = Number(lastPage);
+        if (!session || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) ||
+          start < 1 || end < start || !total || end > Number(total)) throw new Error('Informe um trecho válido dentro do total de páginas da aula.');
+        session.firstPage = start;
+        session.lastPage = end;
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Sessão inválida.');
+      return;
+    }
     const result = correct !== '' || incorrect !== '' ? { correct: Number(correct), incorrect: Number(incorrect) } : undefined;
     const readingChanged = total !== (progress?.totalPages.toString() ?? '') ||
       incidence !== (progress?.incidence?.toString() ?? '') || incidenceTopic !== (progress?.incidenceTopic ?? '') ||
       read !== (progress?.readPages.toString() ?? '0') || day !== (progress?.resumeOn ?? '') ||
       stars !== (progress?.stars?.toString() ?? '') ||
       studySteps.some(({ id }) => steps.includes(id) !== Boolean(progress?.completedSteps?.includes(id)));
-    const next = readingChanged || !result ? { totalPages: Number(total), readPages: Number(read) } : undefined;
+    const advancePage = session?.lastPage !== undefined && ['theory', 'literal', 'strategic'].includes(category)
+      ? Math.max(Number(read), session.lastPage) : Number(read);
+    const next = readingChanged || advancePage !== Number(read) || (!result && !session)
+      ? { totalPages: Number(total), readPages: advancePage } : undefined;
     if (result && !(correctingExercises && result.correct === 0 && result.incorrect === 0) && !validExerciseResult(result)) {
       setError('Informe números inteiros e pelo menos uma questão respondida.');
       return;
@@ -99,11 +129,35 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
       return;
     }
     await onSave(next, day || null, stars === '' ? null : Number(stars), steps, result, correctingExercises,
-      incidence === '' ? null : Number(incidence), incidenceTopic);
+      incidence === '' ? null : Number(incidence), incidenceTopic, session);
   }
 
   return <form onSubmit={submit}>
     <h3>{title}</h3>
+    <fieldset className="rt-exercise-fields" disabled={busy}>
+      <legend>Registro de tempo</legend>
+      <div className="fields">
+        <label>Categoria<select value={category} onChange={(event) => setCategory(event.target.value as SessionInput['category'])}>
+          {sessionCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select></label>
+        <label>Data do estudo<input type="date" value={sessionDay} max={studyDay()}
+          onChange={(event) => setSessionDay(event.target.value)} /></label>
+        <label>Tempo de estudo · hh:mm:ss<input type="text" inputMode="text" placeholder="00:30:00" value={duration}
+          onChange={(event) => setDuration(event.target.value)} /></label>
+      </div>
+      <label className="rt-pareto-toggle"><input type="checkbox" checked={counted}
+        onChange={(event) => setCounted(event.target.checked)} /> Contabilizar no tempo disponível do dia</label>
+      <div className="fields">
+        <label>Página inicial desta sessão (opcional)<input type="number" min="1" step="1" value={firstPage}
+          onChange={(event) => setFirstPage(event.target.value)} /></label>
+        <label>Página final desta sessão (opcional)<input type="number" min="1" step="1" value={lastPage}
+          onChange={(event) => setLastPage(event.target.value)} /></label>
+      </div>
+      <label>Observação da sessão<textarea maxLength={500} rows={2} value={note}
+        onChange={(event) => setNote(event.target.value)} /></label>
+      <p>Revisão desconta da reserva de revisão. As demais categorias descontam do avanço.
+        Registros em dias anteriores entram no histórico. Um trecho de revisão mantém o avanço de leitura já salvo.</p>
+    </fieldset>
     <div className="fields">
       <label>Páginas totais<input type="number" min="1" step="1" value={total}
         onChange={(event) => setTotal(event.target.value)} /></label>

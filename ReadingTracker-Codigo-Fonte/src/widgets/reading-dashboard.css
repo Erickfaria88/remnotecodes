@@ -52,6 +52,11 @@
   letter-spacing: -.025em;
 }
 
+.rt-dashboard-frame .rt-lesson-nav { top: 114px; }
+@media (min-width: 760px) {
+  .rt-dashboard-frame .rt-lesson-nav { top: 80px; }
+}
+
 .rt-dashboard-frame .rt-tabs {
   grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
   width: 100%;

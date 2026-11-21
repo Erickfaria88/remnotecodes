@@ -2,7 +2,10 @@ import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation, type RNPlugi
 import { lessonRequestKey, type LessonDashboardRequest } from '../remnote/lesson-dashboard';
 import { DocumentProgress } from '../components/DocumentProgress';
 import { ParetoCoverage } from '../components/ParetoCoverage';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { SessionHistory } from '../components/SessionHistory';
+import type { SessionInput } from '../study-sessions';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { SubjectPicker } from '../components/SubjectPicker';
 import { validPhase } from '../recommendations';
 import { PhasedSubjects } from '../components/PhasedSubjects';
 import { ReviewAgenda, ScheduleReview } from '../components/ReviewAgenda';
@@ -89,8 +92,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const [view, setView] = useState<'resume' | 'subjects' | 'settings' | 'agenda' | 'exercises'>('resume');
   const [collapsed, setCollapsed] = useState(false);
   const [lessonPaneId, setLessonPaneId] = useState<string>();
-  const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<Subject[]>();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [subject, setSubject] = useState<Subject>();
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -149,22 +151,13 @@ function BaseTracker({ baseId }: { baseId: string }) {
     }
   }
 
-  function search(event: FormEvent) {
-    event.preventDefault();
-    if (!query.trim()) return;
-    void run(async () => {
-      setMatches(undefined);
-      setMatches(await searchSubjects(plugin, query.trim()));
-    });
-  }
-
   function selectSubject(next: Subject) {
     void run(async () => {
       const items = await loadLessons(plugin, next.rem._id);
       setSubject(next);
       setLessons(items);
       setSelected(null);
-      setMatches(undefined);
+      setPickerOpen(false);
     });
   }
 
@@ -185,7 +178,6 @@ function BaseTracker({ baseId }: { baseId: string }) {
       if (!items.some((item) => item.rem._id === id)) throw new Error('Aula indisponível.');
       setSubject({ rem: parent, title: await documentTitle(plugin, parent), parent: undefined });
       setLessons(items);
-      setMatches(undefined);
       setSelected(id);
   }
 
@@ -226,7 +218,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
 
   async function saveLesson(progress: Progress | undefined, resumeOn: string | null, stars: number | null,
     steps: StudyStep[], exercises?: ExerciseResult, replaceExercises = false,
-    incidence?: number | null, incidenceTopic?: string) {
+    incidence?: number | null, incidenceTopic?: string, session?: SessionInput) {
     if (!lesson || !subjectId) return;
     await run(async () => {
       const current = await plugin.rem.findOne(lesson.rem._id);
@@ -234,7 +226,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
         throw new Error('A aula mudou de disciplina ou está indisponível. Atualize a lista.');
       }
       setData(await repository.saveStudy(lesson.rem._id, progress, resumeOn, stars, steps, exercises, replaceExercises,
-        incidence, incidenceTopic));
+        incidence, incidenceTopic, session ? { ...session, lessonId: lesson.rem._id, subjectId,
+          title: lesson.title, subject: subject!.title } : undefined));
       setFormRevision((revision) => revision + 1);
       setStatus('Estudo salvo.');
     });
@@ -285,6 +278,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
   }
 
   return <main className={collapsed ? 'reading-tracker-panel rt-dashboard-collapsed' : 'reading-tracker-panel'} tabIndex={0} aria-label="Reading Tracker" aria-busy={busy}>
+    {pickerOpen && data && <SubjectPicker plugin={plugin} phases={data.subjectPhases} busy={busy}
+      onClose={() => setPickerOpen(false)} onSelect={selectSubject} />}
     <header className="rt-header">
       {isDashboard ? <div className="rt-dashboard-heading">
         <button type="button" className="rt-dashboard-toggle" aria-expanded={!collapsed}
@@ -348,18 +343,16 @@ function BaseTracker({ baseId }: { baseId: string }) {
       </section>
     </div>}
     {data && <div hidden={view !== 'subjects'} className="rt-view">
-      <form className="rt-card rt-search" onSubmit={search}>
-        <label>Disciplina<input type="search" value={query} required
-          onChange={(event) => { setQuery(event.target.value); setMatches(undefined); }} /></label>
-        <button className="rt-primary" disabled={busy}>Buscar</button>
-      </form>
-      {matches && (matches.length === 0 ? <p>Nenhum documento encontrado.</p> :
-        <ul aria-label="Disciplinas encontradas">{matches.map((match) =>
-          <li key={match.rem._id}><button className="rt-row-main" disabled={busy} onClick={() => selectSubject(match)}>
-            <strong>{match.title}</strong><span>{data.subjectPhases[match.rem._id] ? 'Fase ' + data.subjectPhases[match.rem._id] : 'Sem fase'}</span>{match.parent && <span>Em {match.parent}</span>}
-          </button></li>)}</ul>)}
+      <div className="rt-card rt-subject-heading">
+        <div><strong>{subject?.title ?? 'Selecione uma disciplina'}</strong>
+          {subject && <p>{data.subjectPhases[subject.rem._id] ? 'Fase ' + data.subjectPhases[subject.rem._id] : 'Sem fase cadastrada'}</p>}</div>
+        <button className="rt-primary" type="button" disabled={busy} onClick={() => setPickerOpen(true)}>
+          {subject ? 'Trocar disciplina' : 'Selecionar disciplina'}
+        </button>
+      </div>
       {subject && <section className="rt-card">
         <h2>{subject.title}</h2>
+        <details><summary>Configurar fase da disciplina</summary>
         <form key={subject.rem._id + ':' + (data.subjectPhases[subject.rem._id] ?? '')} onSubmit={(event) => {
           event.preventDefault();
           const value = String(new FormData(event.currentTarget).get('phase') ?? '');
@@ -373,7 +366,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
           <label>Fase da disciplina<input name="phase" type="number" min="1" step="1"
             defaultValue={data.subjectPhases[subject.rem._id] ?? ''} placeholder="Sem fase" /></label>
           <button disabled={busy}>Salvar fase</button>
-        </form>
+        </form></details>
         <button disabled={busy} onClick={() => void run(async () => {
           const current = await loadLessons(plugin, subject.rem._id);
           setLessons(current);
@@ -381,19 +374,27 @@ function BaseTracker({ baseId }: { baseId: string }) {
           setData(await repository.load());
           setFormRevision((revision) => revision + 1);
         })}>Atualizar aulas e progresso</button>
-        <ParetoCoverage records={data.lessons} lessons={lessons.map((item) => ({ id: item.rem._id, title: item.title }))}
-          onSelect={setSelected} />
+        <details><summary>Cobertura dos assuntos mais cobrados</summary>
+          <ParetoCoverage records={data.lessons} lessons={lessons.map((item) => ({ id: item.rem._id, title: item.title }))}
+            onSelect={setSelected} />
+        </details>
+        <details open={!lesson}><summary>Lista e progresso das aulas · {lessons.length}</summary>
         <SubjectDashboard lessons={lessons} records={data.lessons} pace={pace}
           selected={selected} onSelect={setSelected} />
+        </details>
       </section>}
-      <PhasedSubjects plugin={plugin} phases={data.subjectPhases} records={data.lessons} refresh={formRevision} busy={busy} onSelect={selectSubject}
-        onRemove={(id) => void run(async () => {
-          setData(await repository.savePhase(id, null));
-          setStatus('Disciplina removida da fase.');
-        })} />
     </div>}
     {data && lesson && subject && <section key={lesson.rem._id + ':' + formRevision} className="rt-card rt-view"
       hidden={view === 'settings' || view === 'agenda'} ref={lessonEditor} aria-label="Progresso da aula">
+          <nav className="rt-lesson-nav" aria-label="Navegar pelas aulas">
+            <button type="button" disabled={busy || lessons[0]?.rem._id === selected}
+              onClick={() => setSelected(lessons[lessons.findIndex((item) => item.rem._id === selected) - 1]?.rem._id ?? selected)}>← Anterior</button>
+            <label>Aula<select value={selected ?? ''} disabled={busy} onChange={(event) => setSelected(event.target.value)}>
+              {lessons.map((item) => <option key={item.rem._id} value={item.rem._id}>{item.title}</option>)}
+            </select></label>
+            <button type="button" disabled={busy || lessons[lessons.length - 1]?.rem._id === selected}
+              onClick={() => setSelected(lessons[lessons.findIndex((item) => item.rem._id === selected) + 1]?.rem._id ?? selected)}>Próxima →</button>
+          </nav>
           <LessonForm title={lesson.title}
             progress={record} exercises={data.exercises[lesson.rem._id]} busy={busy}
             calendarId={baseId + ":" + lesson.rem._id} lessonId={lesson.rem._id} onSave={saveLesson} />
@@ -405,11 +406,24 @@ function BaseTracker({ baseId }: { baseId: string }) {
               setStatus('Revisão agendada.');
             })} />
           {record && <LessonMetrics progress={record} pace={pace} />}
+          <SessionHistory sessions={data.sessions ?? {}} lessonId={lesson.rem._id} busy={busy}
+            onSave={(id, changes) => run(async () => { setData(await repository.updateSession(id, changes)); setStatus('Tempo da sessão atualizado.'); })}
+            onRemove={(id) => run(async () => { setData(await repository.removeSession(id)); setStatus('Registro de tempo removido.'); })} />
           <button disabled={busy} onClick={() => void run(() => openLesson(lesson.rem))}>
             Abrir aula no RemNote
           </button>
     </section>}
     <div hidden={!!data && view !== 'settings'} className="rt-view">
+      {data && <details><summary>Organizar disciplinas por fase</summary>
+        <PhasedSubjects plugin={plugin} phases={data.subjectPhases} records={data.lessons} refresh={formRevision} busy={busy}
+          onSelect={(next) => { setView('subjects'); selectSubject(next); }}
+          onRemove={(id) => void run(async () => {
+            setData(await repository.savePhase(id, null)); setStatus('Disciplina removida da fase.');
+          })} />
+      </details>}
+      {data && <SessionHistory sessions={data.sessions ?? {}} busy={busy}
+        onSave={(id, changes) => run(async () => { setData(await repository.updateSession(id, changes)); setStatus('Tempo da sessão atualizado.'); })}
+        onRemove={(id) => run(async () => { setData(await repository.removeSession(id)); setStatus('Registro de tempo removido.'); })} />}
       {data && <form className="rt-card" key={data.dailyMinutes + ':' + formRevision} onSubmit={(event) => {
         event.preventDefault();
         const value = Number(new FormData(event.currentTarget).get('dailyHours'));
