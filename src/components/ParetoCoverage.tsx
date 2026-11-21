@@ -1,6 +1,7 @@
 import { paretoCoverage } from '../pareto';
 import type { ReadingRecord } from '../resume';
 
+const number = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 4 });
 const format = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
 
 export function ParetoCoverage({ records, lessons, onSelect }: {
@@ -8,13 +9,18 @@ export function ParetoCoverage({ records, lessons, onSelect }: {
 }) {
   const result = paretoCoverage(records, lessons.map((row) => row.id));
   const names = new Map(lessons.map((row) => [row.id, row.title]));
+  const difference = Math.round((100 - result.total) * 10000) / 10000;
   return <section className="rt-card" aria-label="Cobertura dos assuntos mais cobrados">
     <h3>Cobertura dos assuntos mais cobrados</h3>
+    <p><strong>Soma cadastrada · {number(result.total)}%</strong></p>
+    <p>{difference > 0 ? 'Faltam ' + number(difference) + ' pontos percentuais para chegar a 100%.' :
+      difference < 0 ? 'Excesso de ' + number(-difference) + ' pontos percentuais acima de 100%.' :
+      'Incidência cadastrada completa · 100%.'}</p>
     {!result.registered ? <p>Informe a incidência das aulas para selecionar os assuntos que somam pelo menos 80% do levantamento.</p> :
       result.issues.length ? <div role="alert">{[...new Set(result.issues)].map((issue) => <p key={issue}>{issue}</p>)}</div> : <>
         <p><strong>{result.core.length} de {result.topics} assuntos</strong> representam <strong>{format(result.incidence)}</strong> de incidência cadastrada.</p>
         {!result.reachesTarget && <p>Cadastro parcial · a incidência informada ainda não alcança 80%. Complete os assuntos restantes.</p>}
-        <p>{result.registered} de {lessons.length} aulas com incidência · soma informada {format(result.total)}</p>
+        <p>{result.registered} de {lessons.length} aulas com incidência</p>
         <label>Leitura do núcleo prioritário · {format(result.reading)}
           <progress max={100} value={result.reading} style={{ width: '100%', display: 'block', accentColor: '#2651ba' }} />
         </label>

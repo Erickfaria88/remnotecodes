@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { buildAdvancePlan } from '../advance-plan';
 import { studyDay } from '../resume';
-import { reviewBudget } from '../review-plan';
+import { remainingDailyTime } from '../study-sessions';
 import type { Backup } from '../remnote/storage';
 import { paretoCoverage } from '../pareto';
 
@@ -21,7 +21,7 @@ export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, ava
   }));
   const candidates = paretoOnly ? new Map([...subjects].filter(([id]) => priorityIds.has(id))) : subjects;
   const phases = [...new Set([...subjects.values()].flatMap((id) => data.subjectPhases[id] ? [data.subjectPhases[id]] : []))].sort((a, b) => a - b);
-  const budget = availableMinutes ?? reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study;
+  const budget = availableMinutes ?? remainingDailyTime(data).study;
   const automaticPhase = buildAdvancePlan(data, candidates, budget, studyDay(), null).selected[0]?.phase;
   const phase = choice === 'all' ? null : choice === 'auto' ? automaticPhase ?? null : Number(choice);
   const plan = buildAdvancePlan(data, candidates, budget, studyDay(), phase);

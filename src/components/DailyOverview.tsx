@@ -1,7 +1,7 @@
 import type { Backup } from '../remnote/storage';
 import { attentionLessons } from '../study-attention';
 import { useState } from 'react';
-import { reviewBudget } from '../review-plan';
+import { formatDuration, remainingDailyTime } from '../study-sessions';
 
 type LessonName = { title: string; subject: string; subjectId: string };
 
@@ -14,7 +14,7 @@ export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onR
   const rows = attentionLessons(data, subjects, Number(minimum));
   const reviews = Object.values(data.reviews).filter((row) => !row.doneOn && row.dueOn <= today);
   const overdue = reviews.filter((row) => row.dueOn < today).length;
-  const reviewMinutes = reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).review;
+  const time = remainingDailyTime(data, today);
   const few = [...titles.keys()].filter((id) => {
     const result = data.exercises[id];
     return result && result.correct + result.incorrect < Number(minimum);
@@ -23,10 +23,12 @@ export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onR
     <section aria-label="Resumo do dia">
       <h3>Seu dia de estudos</h3>
       <div className="rt-daily-grid">
-        <div><strong>{data.dailyMinutes} min disponíveis</strong><p>Tempo diário definido em Ajustes</p></div>
-        <div><strong>{reviewMinutes} min para revisão</strong><p>Reserva configurada em Ajustes</p></div>
-        <div><strong>{data.dailyMinutes - reviewMinutes} min para avançar e reforçar</strong><p>Leitura e questões</p></div>
+        <div><strong>{formatDuration(time.remainingSeconds)} disponíveis hoje</strong>
+          <p>{formatDuration(time.usedSeconds)} registrados · meta {data.dailyMinutes} min</p></div>
+        <div><strong>{time.review} min restantes para revisão</strong><p>{formatDuration(time.reviewUsed)} realizados</p></div>
+        <div><strong>{time.study} min restantes para avançar e reforçar</strong><p>{formatDuration(time.studyUsed)} realizados</p></div>
       </div>
+      {time.overtimeSeconds > 0 && <p>Meta diária superada em {formatDuration(time.overtimeSeconds)}.</p>}
       <button type="button" disabled={busy} onClick={onReviews}>
         Ver revisões pendentes · {reviews.length}
       </button>

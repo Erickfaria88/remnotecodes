@@ -1,7 +1,7 @@
 import { validReview, type ScheduledReview } from '../review-agenda';
 import { validPace, validProgress, type Progress } from '../progress';
 import { validPhase, validStars } from '../recommendations';
-import { validStudyDay, type ReadingRecord } from '../resume';
+import { studyDay, validStudyDay, type ReadingRecord } from '../resume';
 
 import { defaultDailyMinutes, validDailyMinutes } from '../study-budget';
 
@@ -9,6 +9,7 @@ import { validStudySteps, type StudyStep } from '../study-steps';
 
 import { validExerciseResult, type ExerciseResult } from '../exercise-results';
 import { validIncidence } from '../pareto';
+import { validSession, type StudySession } from '../study-sessions';
 
 export interface Backup {
   version: 1;
@@ -23,6 +24,7 @@ export interface Backup {
   dailyMinutesCustomized?: true;
   reviewShare?: number;
   secondsPerCard?: number;
+  sessions?: Record<string, StudySession>;
 }
 
 interface SyncedStorage {
@@ -123,7 +125,17 @@ export function parseBackup(value: unknown, baseId: string): Backup {
     if (!validId(id) || !validExerciseResult(result)) throw new Error('Resultado de exercícios inválido.');
     exercises[id] = { correct: result.correct, incorrect: result.incorrect };
   }
-  return { version: 1, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes,
+  const sessions: Record<string, StudySession> = Object.create(null);
+  if (value.sessions !== undefined) {
+    if (!isObject(value.sessions)) throw new Error('Histórico de tempo inválido.');
+    for (const [id, row] of Object.entries(value.sessions)) {
+      if (!validId(id) || !validSession(row) || row.id !== id || !validId(row.lessonId) || !validId(row.subjectId)) {
+        throw new Error('Sessão de estudo inválida.');
+      }
+      sessions[id] = { ...row };
+    }
+  }
+  return { version: 1, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, sessions,
     reviewShare, secondsPerCard, ...(value.dailyMinutesCustomized === true ? { dailyMinutesCustomized: true as const } : {}) };
 }
 
@@ -161,9 +173,17 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
 
   function saveStudy(id: string, progress?: Progress, resumeOn?: string | null, stars?: number | null,
     completedSteps?: StudyStep[], result?: ExerciseResult, replaceExercises = false,
-    incidence?: number | null, incidenceTopic?: string) {
+    incidence?: number | null, incidenceTopic?: string, session?: StudySession) {
     return write(async () => {
       const data = await load();
+      if (session) {
+        if (!validSession(session) || session.lessonId !== id || session.day > studyDay()) throw new Error('Sessão de estudo inválida.');
+        const existing = data.sessions?.[session.id];
+        if (existing) {
+          if (JSON.stringify(existing) !== JSON.stringify(session)) throw new Error('Esta sessão já foi salva. Reabra a aula para registrar outro estudo.');
+          return data;
+        }
+      }
       if (progress) {
         const previous = data.lessons[id];
         const date = resumeOn === undefined ? previous?.resumeOn : resumeOn;
@@ -182,6 +202,7 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
           incorrect: (replaceExercises ? 0 : previous?.incorrect ?? 0) + result.incorrect,
         };
       }
+      if (session) data.sessions = { ...data.sessions, [session.id]: session };
       return data;
     });
   }
@@ -189,6 +210,21 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
   return {
     load,
     saveStudy,
+    updateSession: (id: string, changes: Pick<StudySession, 'day' | 'category' | 'seconds' | 'counted' | 'note'>) => write(async () => {
+      const data = await load();
+      const previous = data.sessions?.[id];
+      if (!previous) throw new Error('Sessão indisponível. Atualize o painel.');
+      const updated = { ...previous, ...changes };
+      if (!validSession(updated) || updated.day > studyDay()) throw new Error('Sessão de estudo inválida.');
+      data.sessions![id] = updated;
+      return data;
+    }),
+    removeSession: (id: string) => write(async () => {
+      const data = await load();
+      if (!data.sessions?.[id]) throw new Error('Sessão indisponível. Atualize o painel.');
+      delete data.sessions[id];
+      return data;
+    }),
     saveLesson: (id: string, progress: Progress, resumeOn?: string | null, stars?: number | null, completedSteps?: StudyStep[]) =>
       saveStudy(id, progress, resumeOn, stars, completedSteps),
     saveExercise: (id: string, result: ExerciseResult) => saveStudy(id, undefined, undefined, undefined, undefined, result),

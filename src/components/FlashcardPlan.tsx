@@ -2,7 +2,9 @@ import { Queue, usePlugin } from '@remnote/plugin-sdk';
 import { useEffect, useMemo, useState } from 'react';
 import type { Backup } from '../remnote/storage';
 import { loadReviewCards, reviewCandidates } from '../remnote/review-cards';
-import { buildReviewBlocks, reviewBudget } from '../review-plan';
+import { buildReviewBlocks } from '../review-plan';
+import { remainingDailyTime } from '../study-sessions';
+import { studyDay } from '../resume';
 
 export function FlashcardPlan({ data, titles, onOpen, busy }: {
   data: Backup;
@@ -17,7 +19,12 @@ export function FlashcardPlan({ data, titles, onOpen, busy }: {
   const [active, setActive] = useState<string[]>();
   const [revision, setRevision] = useState(0);
   const seconds = data.secondsPerCard ?? 30;
-  const budget = reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3);
+  const [day, setDay] = useState(studyDay);
+  const budget = remainingDailyTime(data, day);
+  useEffect(() => {
+    const interval = setInterval(() => setDay(studyDay()), 30000);
+    return () => clearInterval(interval);
+  }, []);
   const ids = [...titles.keys()].sort().join(',');
   useEffect(() => {
     let current = true;
@@ -30,7 +37,7 @@ export function FlashcardPlan({ data, titles, onOpen, busy }: {
       if (current) setError(cause instanceof Error ? cause.message : 'Falha ao consultar os flashcards.');
     }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [plugin, data.baseId, ids, revision]);
+  }, [plugin, data.baseId, ids, revision, day]);
   const blocks = useMemo(() => buildReviewBlocks(reviewCandidates(data, grouped ?? new Map()),
     budget.review, seconds), [data, grouped, budget.review, seconds]);
   const total = blocks.reduce((sum, block) => sum + block.cards, 0);

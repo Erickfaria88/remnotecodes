@@ -126,3 +126,31 @@ body:has(> :only-child .reading-tracker-panel) { margin: 0; }
 .rt-pareto-steps li { padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; }
 .reading-tracker-panel .rt-pareto-toggle { display: flex; align-items: center; gap: 8px; }
 .reading-tracker-panel .rt-pareto-toggle input { width: auto; margin: 0; }
+
+.rt-subject-dialog {
+  width: min(680px, calc(100vw - 24px));
+  max-height: min(560px, calc(100vh - 24px));
+  margin: auto;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  overflow: auto;
+}
+.rt-subject-dialog::backdrop { background: rgba(15, 23, 42, .42); }
+.rt-subject-dialog > * + * { margin-top: 12px; }
+.rt-subject-results { display: grid; gap: 6px; padding: 0; list-style: none; }
+.rt-lesson-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.rt-lesson-nav label { flex: 1 1 180px; }

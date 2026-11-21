@@ -4,7 +4,7 @@ import { remainingWork } from '../study-budget';
 import { StudyRecommendations } from './StudyRecommendations';
 import { DailyOverview } from './DailyOverview';
 import { FlashcardPlan } from './FlashcardPlan';
-import { reviewBudget } from '../review-plan';
+import { remainingDailyTime } from '../study-sessions';
 import { ParetoCoverage } from './ParetoCoverage';
 import type { RNPlugin } from '@remnote/plugin-sdk';
 import type { Backup } from '../remnote/storage';
@@ -37,7 +37,8 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     let active = true;
     setFailed(false);
     async function load() {
-      const ids = [...new Set([...Object.keys(data.lessons), ...Object.keys(data.exercises)])];
+      const ids = [...new Set([...Object.keys(data.lessons), ...Object.keys(data.exercises),
+        ...Object.values(data.sessions ?? {}).map((row) => row.lessonId)])];
       const rems = ids.length ? await plugin.rem.findMany(ids) : [];
       if (!rems) throw new Error('Aulas indisponíveis.');
       const parents = [...new Set(rems.flatMap((rem) => rem.parent ? [rem.parent] : []))];
@@ -59,8 +60,9 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   }, [plugin, data]);
 
   const subjects = new Map(Array.from(titles ?? [], ([id, entry]) => [id, entry.subjectId]));
-  const studyMinutes = reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study;
-  const forecast = remainingWork(data.lessons, subjects, data.globalPace, data.subjectPaces, Math.max(1, studyMinutes));
+  const studyMinutes = remainingDailyTime(data, today).study;
+  const plannedStudyMinutes = Math.max(0, data.dailyMinutes - Math.round(data.dailyMinutes * (data.reviewShare ?? 100 / 3) / 100));
+  const forecast = remainingWork(data.lessons, subjects, data.globalPace, data.subjectPaces, Math.max(1, plannedStudyMinutes));
   const queue = readingQueue(data.lessons, today, data.globalPace, data.subjectPaces, subjects);
   const short = diversifyLessons(queue.short, subjects);
 
@@ -104,16 +106,16 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
       <section aria-label="Previsão de leitura">
         <h3>Previsão de conclusão</h3>
         {forecast.pending === 0 ? <p>Nenhum material cadastrado pendente.</p> : <>
-          {studyMinutes > 0 && forecast.unknown < forecast.pending &&
+          {plannedStudyMinutes > 0 && forecast.unknown < forecast.pending &&
             <p><strong>{forecast.days} {forecast.days === 1 ? 'dia' : 'dias'}</strong> · {forecast.hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h restantes</p>}
-          <p>{(studyMinutes / 60).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} h por dia para avançar · reserva de revisão descontada</p>
-          {studyMinutes === 0 && <p>Ajuste a reserva de revisão para estimar a conclusão das leituras.</p>}
+          <p>{(plannedStudyMinutes / 60).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} h planejadas por dia para avançar · reserva de revisão descontada</p>
+          {plannedStudyMinutes === 0 && <p>Ajuste a reserva de revisão para estimar a conclusão das leituras.</p>}
           {forecast.unknown > 0 && <p>{forecast.unknown} {forecast.unknown === 1 ? 'aula pendente fora da estimativa' : 'aulas pendentes fora da estimativa'} por falta de ritmo ou documento indisponível.</p>}
         </>}
       </section>
       <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} />
       <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} onSelect={onSelect}
-        availableMinutes={reviewBudget(data.dailyMinutes, data.reviewShare ?? 100 / 3).study} />
+        availableMinutes={studyMinutes} />
       {queue.due.length > 0 && <details><summary>Consultar retomadas de hoje e atrasadas · {queue.due.length}</summary>
         <p>As retomadas concorrem por tempo no plano único de avanço.</p>
         {list(queue.due, true)}
