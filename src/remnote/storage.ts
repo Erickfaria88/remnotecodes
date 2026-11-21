@@ -11,9 +11,10 @@ import { validExerciseResult, type ExerciseResult } from '../exercise-results';
 import { validIncidence } from '../pareto';
 import { validSession, type StudySession } from '../study-sessions';
 import { parsePreparation, type Preparation } from '../exam-preparation';
+import { validAuditBatch, countedQuestions, type AuditBatch } from '../question-audit';
 
 export interface Backup {
-  version: 2;
+  version: 4;
   baseId: string;
   lessons: Record<string, ReadingRecord>;
   globalPace: number | null;
@@ -27,6 +28,7 @@ export interface Backup {
   secondsPerCard?: number;
   sessions?: Record<string, StudySession>;
   preparation?: Preparation;
+  auditBatches?: Record<string, AuditBatch>;
 }
 
 interface SyncedStorage {
@@ -44,11 +46,12 @@ function validId(id: string) {
 }
 
 export function parseBackup(value: unknown, baseId: string): Backup {
-  if (!isObject(value) || ![1, 2].includes(value.version as number) || typeof value.baseId !== 'string') {
+  if (!isObject(value) || ![1, 2, 3, 4].includes(value.version as number) || typeof value.baseId !== 'string') {
     throw new Error('Backup inválido ou versão incompatível.');
   }
   if (value.baseId !== baseId) throw new Error('Este backup pertence a outra base do RemNote.');
-  if (value.version === 2 && value.preparation === undefined) throw new Error('Cadastro de preparação ausente no backup.');
+  if (value.version !== 1 && value.preparation === undefined) throw new Error('Cadastro de preparação ausente no backup.');
+  if ((value.version === 3 || value.version === 4) && value.auditBatches === undefined) throw new Error('Histórico de auditorias ausente no backup.');
   if (!isObject(value.lessons) || !isObject(value.subjectPaces) ||
       (value.globalPace !== null && !validPace(value.globalPace))) {
     throw new Error('Estrutura de backup inválida.');
@@ -138,7 +141,22 @@ export function parseBackup(value: unknown, baseId: string): Backup {
       sessions[id] = { ...row };
     }
   }
-  return { version: 2, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, sessions,
+  const auditBatches:Record<string,AuditBatch>=Object.create(null);
+  if(value.auditBatches!==undefined) {
+    if(!isObject(value.auditBatches))throw new Error('Histórico de auditorias inválido.');
+    const counted=new Set<string>();
+    for(const [id,batch] of Object.entries(value.auditBatches)) {
+      if(!validAuditBatch(batch) || batch.id!==id)throw new Error('Auditoria inválida.');
+      for(const entry of batch.entries) {
+        const key=entry.day+'|'+entry.questionKey;
+        if(counted.has(key))throw new Error('Questão duplicada no histórico de auditorias do dia.');
+        counted.add(key);
+      }
+      auditBatches[id]={id:batch.id,createdAt:batch.createdAt,entries:batch.entries.map(e=>({...e})),
+        ...(batch.reviewSessions?{reviewSessions:batch.reviewSessions.map(s=>({...s}))}:{})};
+    }
+  }
+  return { version: 4, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, sessions, auditBatches,
     reviewShare, secondsPerCard, preparation: parsePreparation(value.preparation), ...(value.dailyMinutesCustomized === true ? { dailyMinutesCustomized: true as const } : {}) };
 }
 
@@ -213,6 +231,37 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
   return {
     load,
     saveStudy,
+    commitAudit: (batch: AuditBatch) => write(async () => {
+      if(!validAuditBatch(batch) || batch.createdAt>Date.now()+60000 || batch.entries.some(e=>e.at>batch.createdAt))throw new Error('Resumo de auditoria inválido.');
+      const data=await load();
+      const other=Object.fromEntries(Object.entries(data.auditBatches??{}).filter(([id])=>id!==batch.id));
+      const counted=countedQuestions(other);const entries:AuditBatch['entries']=[];
+      const submitted=new Set<string>();
+      for(const entry of batch.entries) {
+        const key=entry.day+'|'+entry.questionKey;
+        if(submitted.has(key))throw new Error('Selecione uma única resposta por questão e dia.');
+        submitted.add(key);
+        if(!counted.has(key))entries.push({...entry});
+      }
+      if(batch.reviewSessions?.some(s=>s.day>studyDay()))throw new Error('Não é possível registrar tempo no futuro.');
+      const accepted={id:batch.id,createdAt:batch.createdAt,entries,
+        ...(batch.reviewSessions?.length?{reviewSessions:batch.reviewSessions.map(s=>({...s}))}:{})};
+      const previous=data.auditBatches?.[batch.id];
+      if(previous) {
+        if(JSON.stringify(previous)!==JSON.stringify(accepted))throw new Error('Este bloco já foi confirmado. Confira o histórico antes de fazer correções manuais.');
+        return data;
+      }
+      for(const session of accepted.reviewSessions??[]) {
+        if(data.sessions?.[session.id])throw new Error('O registro de tempo deste bloco já existe. Confira o histórico.');
+        data.sessions={...data.sessions,[session.id]:session};
+      }
+      for(const entry of entries) {
+        const result=data.exercises[entry.lessonId]??{correct:0,incorrect:0};
+        data.exercises[entry.lessonId]={correct:result.correct+Number(entry.correct),incorrect:result.incorrect+Number(!entry.correct)};
+      }
+      data.auditBatches={...data.auditBatches,[batch.id]:accepted};
+      return data;
+    }),
     savePreparation: (preparation: Preparation) => write(async () => ({ ...await load(), preparation: parsePreparation(preparation) })),
     updateSession: (id: string, changes: Pick<StudySession, 'day' | 'category' | 'seconds' | 'counted' | 'note'>) => write(async () => {
       const data = await load();

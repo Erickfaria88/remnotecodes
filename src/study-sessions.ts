@@ -11,6 +11,8 @@ export interface StudySession {
   day: string; category: typeof sessionCategories[number]['id']; seconds: number;
   counted: boolean; note: string;
   firstPage?: number; lastPage?: number;
+  auditId?: string;
+  reviewedCards?: number;
 }
 export type SessionInput = Omit<StudySession, 'lessonId' | 'subjectId' | 'title' | 'subject'>;
 export function parseDuration(value: string) {
@@ -31,6 +33,8 @@ export function validSession(value: unknown): value is StudySession {
     validStudyDay(row.day) && sessionCategories.some((category) => category.id === row.category) &&
     Number.isSafeInteger(row.seconds) && row.seconds > 0 && row.seconds <= 86400 &&
     typeof row.counted === 'boolean' && typeof row.note === 'string' && row.note.length <= 500 &&
+    (row.auditId===undefined || typeof row.auditId==='string' && /^[A-Za-z0-9_-]{1,150}$/.test(row.auditId) && !['__proto__','prototype','constructor'].includes(row.auditId)) &&
+    (row.reviewedCards===undefined || Number.isSafeInteger(row.reviewedCards)&&row.reviewedCards>=0) &&
     (row.firstPage === undefined && row.lastPage === undefined ||
       Number.isSafeInteger(row.firstPage) && Number.isSafeInteger(row.lastPage) && row.firstPage! >= 1 && row.lastPage! >= row.firstPage!);
 }
