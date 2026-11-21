@@ -8,6 +8,7 @@ import { defaultDailyMinutes, validDailyMinutes } from '../study-budget';
 import { validStudySteps, type StudyStep } from '../study-steps';
 
 import { validExerciseResult, type ExerciseResult } from '../exercise-results';
+import { validIncidence } from '../pareto';
 
 export interface Backup {
   version: 1;
@@ -57,6 +58,15 @@ export function parseBackup(value: unknown, baseId: string): Backup {
     const stars = (record as ReadingRecord).stars;
     if (stars !== undefined && !validStars(stars)) throw new Error('Importância da aula inválida.');
     if (stars !== undefined) lessons[id].stars = stars;
+    const { incidence, incidenceTopic } = record as ReadingRecord;
+    if (incidence !== undefined) {
+      if (!validIncidence(incidence)) throw new Error('Incidência inválida. Informe um percentual de 0 a 100.');
+      lessons[id].incidence = incidence;
+    }
+    if (incidenceTopic !== undefined) {
+      if (typeof incidenceTopic !== 'string' || incidenceTopic.length > 200) throw new Error('Assunto compartilhado inválido.');
+      if (incidenceTopic.trim()) lessons[id].incidenceTopic = incidenceTopic.trim();
+    }
     const steps = (record as ReadingRecord).completedSteps;
     if (steps !== undefined) {
       if (!validStudySteps(steps)) throw new Error('Etapas de estudo inválidas.');
@@ -150,7 +160,8 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
   }
 
   function saveStudy(id: string, progress?: Progress, resumeOn?: string | null, stars?: number | null,
-    completedSteps?: StudyStep[], result?: ExerciseResult, replaceExercises = false) {
+    completedSteps?: StudyStep[], result?: ExerciseResult, replaceExercises = false,
+    incidence?: number | null, incidenceTopic?: string) {
     return write(async () => {
       const data = await load();
       if (progress) {
@@ -158,6 +169,8 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
         const date = resumeOn === undefined ? previous?.resumeOn : resumeOn;
         const importance = stars === undefined ? previous?.stars : stars;
         data.lessons[id] = { ...previous, ...progress, resumeOn: date ?? undefined, stars: importance ?? undefined, completedSteps: completedSteps ?? previous?.completedSteps };
+        if (incidence !== undefined) data.lessons[id].incidence = incidence ?? undefined;
+        if (incidenceTopic !== undefined) data.lessons[id].incidenceTopic = incidenceTopic.trim() || undefined;
       }
       if (result !== undefined) {
         const clear = replaceExercises && result.correct === 0 && result.incorrect === 0;

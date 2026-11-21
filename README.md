@@ -109,3 +109,7 @@ No formulário da aula, clique em Corrigir totais de exercícios. Preencha os to
 ## Versão 0.1.11
 O atalho Registrar estudo desta aula registra o widget no documento Dashboard de Estudos antes de abrir a nota. A seleção pendente da aula é consumida após carregar o formulário. O comando Abrir Dashboard de Estudos também refaz o registro ao abrir.
 
+
+## Cobertura dos assuntos mais cobrados · versão 0.1.12
+No formulário de cada aula, informe Incidência deste assunto (%) com o percentual do levantamento dos professores e salve o estudo. O preenchimento sugere estrelas automaticamente; você pode ajustá-las antes de salvar. Se o mesmo assunto abranger várias aulas, use o mesmo Assunto compartilhado e o mesmo percentual em todas elas. O painel da disciplina seleciona assuntos por incidência decrescente até alcançar pelo menos 80%, incluindo o assunto que ultrapassar esse limite. Isso não exige que a seleção represente exatamente 20% das aulas. A cobertura da leitura é ponderada pela incidência; as etapas de um assunto contam quando todas as suas aulas estão concluídas naquela etapa. Cadastros que somam menos de 80% aparecem como parciais; divergências no mesmo assunto e totais acima de 100,5% pedem correção. A pequena tolerância admite arredondamento dos percentuais publicados. Consulte o painel também em Retomar. Ative Focar no núcleo de 80% da incidência cadastrada para filtrar o plano de avanço. Percentuais de disciplinas diferentes são analisados separadamente.
+

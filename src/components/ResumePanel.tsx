@@ -5,6 +5,7 @@ import { StudyRecommendations } from './StudyRecommendations';
 import { DailyOverview } from './DailyOverview';
 import { FlashcardPlan } from './FlashcardPlan';
 import { reviewBudget } from '../review-plan';
+import { ParetoCoverage } from './ParetoCoverage';
 import type { RNPlugin } from '@remnote/plugin-sdk';
 import type { Backup } from '../remnote/storage';
 import type { DailyTask } from '../remnote/daily-tasks';
@@ -90,6 +91,16 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     {failed ? <p role="alert">Não foi possível consultar as aulas de retomada.</p> : !titles ? <p>Carregando…</p> : <>
       <DailyOverview data={data} titles={titles} today={today} busy={busy}
         onSelect={onSelect} onOpen={onOpen} onReviews={onReviews} />
+      <details><summary>Cobertura dos assuntos mais cobrados por disciplina</summary>
+        {[...new Set([...titles.values()].map((row) => row.subjectId))].map((subjectId) => {
+          const items = [...titles].filter(([, row]) => row.subjectId === subjectId);
+          return <section key={subjectId}>
+            <h3>{items[0][1].subject}</h3>
+            <ParetoCoverage records={data.lessons} lessons={items.map(([id, row]) => ({ id, title: row.title }))}
+              onSelect={onSelect} />
+          </section>;
+        })}
+      </details>
       <section aria-label="Previsão de leitura">
         <h3>Previsão de conclusão</h3>
         {forecast.pending === 0 ? <p>Nenhum material cadastrado pendente.</p> : <>
