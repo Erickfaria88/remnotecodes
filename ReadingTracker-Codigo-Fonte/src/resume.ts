@@ -3,6 +3,8 @@ import { effectivePace, type Progress } from './progress';
 import type { StudyStep } from './study-steps';
 
 export interface ReadingRecord extends Progress {
+  incidence?: number;
+  incidenceTopic?: string;
   resumeOn?: string;
   stars?: number;
   completedSteps?: StudyStep[];

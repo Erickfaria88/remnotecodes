@@ -122,3 +122,7 @@ body:has(> :only-child .reading-tracker-panel) { margin: 0; }
 .rt-daily-grid > div { border: 1px solid var(--line); border-radius: 10px; background: var(--soft); padding: 12px; }
 .reading-tracker-panel .rt-attention-red { border-left: 4px solid #c34e45; }
 .reading-tracker-panel .rt-attention-yellow { border-left: 4px solid #c99528; }
+.rt-pareto-steps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rt-pareto-steps li { padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.reading-tracker-panel .rt-pareto-toggle { display: flex; align-items: center; gap: 8px; }
+.reading-tracker-panel .rt-pareto-toggle input { width: auto; margin: 0; }

@@ -4,6 +4,7 @@ import { exerciseAccuracy, validExerciseResult, type ExerciseResult } from '../e
 import { calendarReminder, googleCalendarUrl, studyDay, validStudyDay, type ReadingRecord } from '../resume';
 
 import { studySteps, type StudyStep } from '../study-steps';
+import { incidenceStars, validIncidence } from '../pareto';
 
 interface Props {
   title: string;
@@ -13,7 +14,8 @@ interface Props {
   calendarId: string;
   lessonId: string;
   onSave: (progress: Progress | undefined, resumeOn: string | null, stars: number | null,
-    steps: StudyStep[], exercises?: ExerciseResult, replaceExercises?: boolean) => Promise<void>;
+    steps: StudyStep[], exercises?: ExerciseResult, replaceExercises?: boolean,
+    incidence?: number | null, incidenceTopic?: string) => Promise<void>;
 }
 
 export function LessonForm({ title, progress, exercises, busy, calendarId, lessonId, onSave }: Props) {
@@ -22,6 +24,8 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
   const [correct, setCorrect] = useState('');
   const [incorrect, setIncorrect] = useState('');
   const [correctingExercises, setCorrectingExercises] = useState(false);
+  const [incidence, setIncidence] = useState(progress?.incidence?.toString() ?? '');
+  const [incidenceTopic, setIncidenceTopic] = useState(progress?.incidenceTopic ?? '');
   const [error, setError] = useState('');
   const [day, setDay] = useState(progress?.resumeOn ?? '');
   const [stars, setStars] = useState(progress?.stars?.toString() ?? '');
@@ -72,6 +76,7 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
     event.preventDefault();
     const result = correct !== '' || incorrect !== '' ? { correct: Number(correct), incorrect: Number(incorrect) } : undefined;
     const readingChanged = total !== (progress?.totalPages.toString() ?? '') ||
+      incidence !== (progress?.incidence?.toString() ?? '') || incidenceTopic !== (progress?.incidenceTopic ?? '') ||
       read !== (progress?.readPages.toString() ?? '0') || day !== (progress?.resumeOn ?? '') ||
       stars !== (progress?.stars?.toString() ?? '') ||
       studySteps.some(({ id }) => steps.includes(id) !== Boolean(progress?.completedSteps?.includes(id)));
@@ -85,11 +90,16 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
       return;
     }
     setError('');
+    if (incidence !== '' && !validIncidence(Number(incidence))) {
+      setError('Informe uma incidência entre 0 e 100%.');
+      return;
+    }
     if (day && !validStudyDay(day)) {
       setError('Escolha uma data válida para a retomada.');
       return;
     }
-    await onSave(next, day || null, stars === '' ? null : Number(stars), steps, result, correctingExercises);
+    await onSave(next, day || null, stars === '' ? null : Number(stars), steps, result, correctingExercises,
+      incidence === '' ? null : Number(incidence), incidenceTopic);
   }
 
   return <form onSubmit={submit}>
@@ -100,6 +110,23 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
       <label>Páginas lidas<input type="number" min="0" step="1" value={read}
         onChange={(event) => setRead(event.target.value)} /></label>
     </div>
+    <fieldset className="rt-exercise-fields" disabled={busy}>
+      <legend>Incidência na prova · Passo Estratégico</legend>
+      <label>Incidência deste assunto (%)
+        <input type="number" min="0" max="100" step="any" value={incidence}
+          placeholder="Ex.: 18,7" onChange={(event) => {
+            const value = event.target.value;
+            setIncidence(value);
+            if (value !== '' && validIncidence(Number(value))) setStars(String(incidenceStars(Number(value))));
+          }} />
+      </label>
+      <label>Assunto compartilhado entre aulas (opcional)
+        <input type="text" maxLength={200} value={incidenceTopic}
+          placeholder="Ex.: Direito Societário" onChange={(event) => setIncidenceTopic(event.target.value)} />
+      </label>
+      <p>Use o percentual do levantamento dos professores. Ao preencher, as estrelas são sugeridas automaticamente e podem ser ajustadas.
+        Se o assunto abranger várias aulas, use o mesmo nome e percentual em todas para contabilizá-lo uma vez.</p>
+    </fieldset>
     <label>Importância para a prova
       <select value={stars} onChange={(event) => setStars(event.target.value)}>
         <option value="">Sem classificação</option>

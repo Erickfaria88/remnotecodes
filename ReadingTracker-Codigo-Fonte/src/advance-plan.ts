@@ -23,7 +23,8 @@ export function buildAdvancePlan(data: Backup, subjects: Map<string, string>, bu
       ...(near ? ['Leitura quase concluída'] : []),
       ...(concern ? [concern.reason] : []),
     ];
-    const score = ((record?.stars ?? 0) + 1) * (1 + Number(due) * 0.5 + Number(near) * 0.5 +
+    const weight = record?.incidence === undefined ? (record?.stars ?? 0) + 1 : record.incidence / 3 + 1;
+    const score = weight * (1 + Number(due) * 0.5 + Number(near) * 0.5 +
       (concern ? concern.ratio === null ? 0.3 : 1 - concern.ratio : 0)) / minutes;
     return [{ id, subjectId, phase: itemPhase, stars: record?.stars ?? 0, minutes, remaining,
       readingMinutes, practice, score, reasons }];

@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation, type RNPlugin } from '@remnote/plugin-sdk';
 import { lessonRequestKey, type LessonDashboardRequest } from '../remnote/lesson-dashboard';
 import { DocumentProgress } from '../components/DocumentProgress';
+import { ParetoCoverage } from '../components/ParetoCoverage';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { validPhase } from '../recommendations';
 import { PhasedSubjects } from '../components/PhasedSubjects';
@@ -224,14 +225,16 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const pace = effectivePace(data?.globalPace ?? null, subjectPace);
 
   async function saveLesson(progress: Progress | undefined, resumeOn: string | null, stars: number | null,
-    steps: StudyStep[], exercises?: ExerciseResult, replaceExercises = false) {
+    steps: StudyStep[], exercises?: ExerciseResult, replaceExercises = false,
+    incidence?: number | null, incidenceTopic?: string) {
     if (!lesson || !subjectId) return;
     await run(async () => {
       const current = await plugin.rem.findOne(lesson.rem._id);
       if (!current || current.parent !== subjectId || !(await current.isDocument())) {
         throw new Error('A aula mudou de disciplina ou está indisponível. Atualize a lista.');
       }
-      setData(await repository.saveStudy(lesson.rem._id, progress, resumeOn, stars, steps, exercises, replaceExercises));
+      setData(await repository.saveStudy(lesson.rem._id, progress, resumeOn, stars, steps, exercises, replaceExercises,
+        incidence, incidenceTopic));
       setFormRevision((revision) => revision + 1);
       setStatus('Estudo salvo.');
     });
@@ -378,6 +381,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
           setData(await repository.load());
           setFormRevision((revision) => revision + 1);
         })}>Atualizar aulas e progresso</button>
+        <ParetoCoverage records={data.lessons} lessons={lessons.map((item) => ({ id: item.rem._id, title: item.title }))}
+          onSelect={setSelected} />
         <SubjectDashboard lessons={lessons} records={data.lessons} pace={pace}
           selected={selected} onSelect={setSelected} />
       </section>}
