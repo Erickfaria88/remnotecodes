@@ -3,10 +3,11 @@ import type { RNPlugin } from '@remnote/plugin-sdk';
 import { documentTitle } from '../remnote/documents';
 import { useState } from 'react';
 
-export function StudyFilters({ plugin, phases, selection, onPhases, paretoOnly, onPareto, tag, onTag }: {
+export function StudyFilters({ plugin, phases, selection, onPhases, paretoOnly, onPareto, tag, onTag, tagsOnly = false }: {
   plugin: RNPlugin; phases: Record<string, number>; selection: PhaseSelection;
   onPhases: (value: PhaseSelection) => void; paretoOnly: boolean; onPareto: (value: boolean) => void;
   tag?: ReviewTagFilter; onTag: (value: ReviewTagFilter | undefined) => void;
+  tagsOnly?: boolean;
 }) {
   const choices = [...new Set(Object.values(phases))].sort((a, b) => a - b);
   const effective = Array.isArray(selection) ? selection : selection === 'all' ? [...choices, 0] : choices.slice(0, 1);
@@ -15,7 +16,8 @@ export function StudyFilters({ plugin, phases, selection, onPhases, paretoOnly, 
   const [error, setError] = useState('');
   const [searching, setSearching] = useState(false);
   return <section className="rt-card rt-study-filters" aria-label="Filtros de estudo">
-    <h2>Prioridades de hoje</h2>
+    <h2>{tagsOnly ? 'Filtro de flashcards' : 'Prioridades de hoje'}</h2>
+    {!tagsOnly && <>
     <div className="rt-actions">
       <button type="button" aria-pressed={selection === 'auto'} onClick={() => onPhases('auto')}>
         Automática{choices[0] ? ' · Fase ' + choices[0] : ''}
@@ -33,6 +35,7 @@ export function StudyFilters({ plugin, phases, selection, onPhases, paretoOnly, 
     <label className="rt-pareto-toggle"><input type="checkbox" checked={paretoOnly}
       onChange={(event) => onPareto(event.target.checked)} /> Focar no núcleo de 80% para sugestões e revisões</label>
     {paretoOnly && <p>O núcleo é calculado por disciplina. Confira os avisos de cadastro parcial na cobertura.</p>}
+    </>}
     <details><summary>Filtrar flashcards por tag{tag ? ' · ' + tag.title : ''}</summary>
       <div className="rt-actions" aria-label="Tags frequentes">
         {['Erro', 'Foco', '80/20', 'Base Teórica'].map((name) => <button type="button" key={name}

@@ -1,4 +1,5 @@
-import { Queue, usePlugin } from '@remnote/plugin-sdk';
+import { usePlugin } from '@remnote/plugin-sdk';
+import { ReviewPractice } from './ReviewPractice';
 import { useEffect, useMemo, useState } from 'react';
 import type { Backup } from '../remnote/storage';
 import { loadReviewCards, reviewCandidates } from '../remnote/review-cards';
@@ -7,13 +8,14 @@ import { remainingDailyTime } from '../study-sessions';
 import { studyDay } from '../resume';
 import { filterStudySubjects, type ReviewTagFilter } from '../study-scope';
 
-export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag }: {
+export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag, priorities }: {
   data: Backup;
   titles: Map<string, { title: string; subject: string; subjectId: string }>;
   onOpen: (id: string) => void;
   busy: boolean;
   paretoOnly: boolean;
   tag?: ReviewTagFilter;
+  priorities?: Record<string,number>;
 }) {
   const plugin = usePlugin();
   const [grouped, setGrouped] = useState<Awaited<ReturnType<typeof loadReviewCards>>>();
@@ -46,8 +48,9 @@ export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag }: {
     }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
   }, [plugin, data.baseId, ids, revision, day, tag?.id, tag?.includeInherited]);
-  const blocks = useMemo(() => buildReviewBlocks(reviewCandidates(data, ready ? grouped ?? new Map() : new Map()),
-    budget.review, seconds), [data, grouped, budget.review, seconds, ready]);
+  const blocks = useMemo(() => buildReviewBlocks(reviewCandidates(data, ready ? grouped ?? new Map() : new Map())
+    .map(row => priorities ? {...row,incidence:priorities[row.id]??0} : row),
+    budget.review, seconds), [data, grouped, budget.review, seconds, ready, priorities]);
   const total = blocks.reduce((sum, block) => sum + block.cards, 0);
 
   async function start(cardIds: string[]) {
@@ -68,10 +71,8 @@ export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag }: {
     {!loading && grouped && blocks.length === 0 && <p>Nenhum flashcard pendente encontrado para os filtros e o tempo disponíveis.</p>}
     <p>Estimativa pelos cartões com data até hoje, incluindo atrasados. Cartões novos sem data ficam fora da contagem.
       A prática pode reapresentar cartões e alterar a duração.</p>
-    {active && ready ? <div>
-      <button type="button" onClick={() => { setActive(undefined); setRevision((value) => value + 1); }}>Voltar ao plano e atualizar</button>
-      <Queue key={active.join(',')} cardIds={active} height={480} width="100%" />
-    </div> : <ul>{blocks.map((block, index) => <li className="rt-row" key={index}>
+    {active && ready ? <ReviewPractice key={active.join(',')} cards={active}
+      onExit={() => { setActive(undefined); setRevision((value) => value + 1); }} /> : <ul>{blocks.map((block, index) => <li className="rt-row" key={index}>
       <strong>Bloco de ~{Math.ceil(block.minutes)} min · {block.cards} flashcards</strong>
       {block.lessons.map((lesson) => <div key={lesson.id}>
         <p>{titles.get(lesson.id)?.subject} · {titles.get(lesson.id)?.title}</p>
