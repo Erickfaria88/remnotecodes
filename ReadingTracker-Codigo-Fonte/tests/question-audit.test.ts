@@ -3,7 +3,7 @@ import {strict as assert} from 'node:assert';
 import type {RNPlugin} from '@remnote/plugin-sdk';
 import {outcome,historyDelta,auditRows,approvedEntries,tecQuestionKeys,simplifyAuditRows,selectedAuditRows,type AuditCard,type AuditBatch} from '../src/question-audit';
 import {createRepository,parseBackup} from '../src/remnote/storage';
-import {auditDraftKey,prepareAudit,refreshAudit,validDraft,readHistory,claimAudit,releaseAudit,stableAuditRecovery,type AuditDraft} from '../src/remnote/question-audit';
+import {auditDraftKey,prepareAudit,refreshAudit,validDraft,readHistory,claimAudit,releaseAudit,stableAuditRecovery,keepAuditDraft,type AuditDraft} from '../src/remnote/question-audit';
 import {studyDay} from '../src/resume';
 const t=Date.now()-3*86400000;
 const baseline=[{date:t-86400000,score:1}];
@@ -154,4 +154,28 @@ test('rascunho finalizado e inalterado mantém respostas, mas interrupção ou a
   const legacy={...card(),title:'📖 Julgue o item',questionKey:undefined,identityIssue:'Sem link TEC nos ancestrais do cartão. O ícone de livro sozinho não identifica uma questão.'};
   const rows=simplifyAuditRows(auditRows([legacy],{c1:[...baseline,{date:t+10,score:1}]},t,t+100),[legacy]);
   assert.equal(rows[0].include,true);
+});
+test('pendência marcada e identificação inválida ficam fora do registro sem bloquear respostas válidas',()=>{
+  const valid=row(1);const pending={...row(0),id:'pending',issue:'Histórico alterado.',include:true};
+  const badKey={...row(1),id:'bad-key',questionKey:'https://www.tecconcursos.com.br/questoes/123',include:true};
+  const selected=selectedAuditRows([valid,pending,badKey],['lesson'],new Set());
+  assert.deepEqual(selected.map(r=>r.id),[valid.id]);assert.equal(approvedEntries(selected).length,1);
+});
+test('voltar preserva rascunho e não registra exercícios; não sobrescreve outro bloco',async()=>{
+  const local=new Map<string,unknown>();let syncedWrites=0;
+  const sdk={storage:{async getLocal(k:string){return local.get(k);},async setLocal(k:string,v:unknown){local.set(k,v);},async setSynced(){syncedWrites++;}}} as unknown as RNPlugin;
+  const draft:AuditDraft={version:1,id:'a1',baseId:'base',phase:'summary',startedAt:t,endedAt:t+1000,cards:[card()],histories:{c1:baseline},issues:{},rows:[{...row(1),issue:'pendente'}]};
+  await keepAuditDraft(sdk,draft);assert.equal((local.get(auditDraftKey('base')) as AuditDraft).rows![0].issue,'pendente');assert.equal(syncedWrites,0);
+  await assert.rejects(()=>keepAuditDraft(sdk,{...draft,id:'a2'}));assert.equal((local.get(auditDraftKey('base')) as AuditDraft).id,'a1');
+});
+test('consulta que termina depois de fechar a tela não recria nem altera o rascunho',async()=>{
+  const session=new Map<string,unknown>();const local=new Map<string,unknown>();let resume!:(value:unknown[])=>void;let entered!:()=>void;
+  const started=new Promise<void>(resolve=>{entered=resolve;});
+  const sdk={kb:{async getCurrentKnowledgeBaseData(){return {_id:'base'};}},storage:{
+    async getSession(k:string){return session.get(k);},async setSession(k:string,v:unknown){session.set(k,v);},async getLocal(k:string){return local.get(k);},async setLocal(k:string,v:unknown){local.set(k,v);}},
+    card:{async findMany(){entered();return new Promise<unknown[]>(resolve=>{resume=resolve;});}}} as unknown as RNPlugin;
+  const draft:AuditDraft={version:1,id:'a1',baseId:'base',phase:'running',startedAt:t,cards:[card()],histories:{c1:baseline},issues:{}};
+  const pending=refreshAudit(sdk,draft,'screen1');await started;await releaseAudit(sdk,'base','a1','screen1');
+  resume([{_id:'c1',repetitionHistory:[...baseline,{date:t+100,score:1}]}]);
+  await assert.rejects(()=>pending,/encerrada/);assert.equal(local.size,0);
 });

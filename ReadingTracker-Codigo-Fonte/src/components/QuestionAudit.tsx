@@ -1,7 +1,7 @@
 import { AppEvents, usePlugin } from '@remnote/plugin-sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { approvedEntries, auditRows, countedQuestions, simplifyAuditRows, selectedAuditRows, type AuditRow } from '../question-audit';
-import { auditDraftKey, claimAudit, prepareAudit, refreshAudit, releaseAudit, verifyAuditBase, stableAuditRecovery, type AuditDraft } from '../remnote/question-audit';
+import { auditDraftKey, claimAudit, prepareAudit, refreshAudit, releaseAudit, verifyAuditBase, stableAuditRecovery, keepAuditDraft, type AuditDraft } from '../remnote/question-audit';
 import { createRepository, type Backup } from '../remnote/storage';
 import { studyDay } from '../resume';
 import {defaultReviewTime,reviewedCardCounts,reviewSessions,type ReviewLessonInfo,type ReviewTimeInput} from '../review-time';
@@ -18,6 +18,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
   const [savedCount,setSavedCount]=useState<number>();const [uncertain,setUncertain]=useState(false);
   const [timeInput,setTimeInput]=useState<ReviewTimeInput>({enabled:true,duration:'',day:studyDay(),lessonIds:[],counted:true,note:''});
   const mounted=useRef(true);const closing=useRef(false);const action=useRef(false);
+  const leaving=useRef(false);
   const chain=useRef<Promise<unknown>>(Promise.resolve());
   const id=useRef(recovered?.id??'audit_'+crypto.randomUUID().replaceAll('-',''));
   const owner=useRef(crypto.randomUUID());
@@ -27,6 +28,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     void (async()=>{
       await claimAudit(plugin,baseId,id.current,owner.current);
       const loaded=await repo.load();if(live)setData(loaded);
+      if(!live||leaving.current)return;
       if(loaded.auditBatches?.[id.current] && recovered) {
         const next={...recovered,phase:'summary' as const};
         if(live){setSavedCount(loaded.auditBatches[id.current].entries.length);publish(next);}
@@ -57,7 +59,8 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
         const input=recovered.reviewTime??defaultReviewTime(recovered.practiceStartedAt,recovered.endedAt,counts);
         next.reviewTime=input;if(live)setTimeInput(input);
       }
-      await plugin.storage.setLocal(auditDraftKey(baseId),next);
+      if(!live||leaving.current)return;
+      await keepAuditDraft(plugin,next);
       if(live)publish(next);
     })().catch(e=>{if(live)setError(e instanceof Error?e.message:'Falha ao preparar auditoria.');void releaseAudit(plugin,baseId,id.current,owner.current).catch(()=>undefined);});
     return()=>{live=false;mounted.current=false;void releaseAudit(plugin,baseId,id.current,owner.current).catch(()=>undefined);};
@@ -73,6 +76,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
   function scan() {
     const operation=chain.current.then(async()=>{
       if(!current.current)throw new Error('Auditoria ainda não preparada.');
+      if(leaving.current)return current.current;
       const next=await refreshAudit(plugin,current.current,owner.current);publish(next);return next;
     });
     chain.current=operation.catch(()=>undefined);return operation;
@@ -96,6 +100,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
       next={...current.current!,issues:Object.fromEntries(next.cards.map(c=>[c.cardId,'Falha na conferência final; resultado exige auditoria manual.']))};
       setError(e instanceof Error?e.message:'Não foi possível conferir o histórico final.');
     }
+    if(leaving.current||!mounted.current)return;
     next={...next,phase:'summary',endedAt:finishedAt};
     next.rows=simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,next.issues),next.cards);
     const counts=reviewedCardCounts(next.cards,next.histories,next.startedAt,finishedAt);
@@ -126,7 +131,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     if(draft?.phase!=='summary')return;
     const timer=setTimeout(()=>{
       const write=chain.current.then(async()=>{
-        if(current.current && mounted.current && !action.current){const next={...current.current,rows,reviewTime:timeInput};current.current=next;await plugin.storage.setLocal(auditDraftKey(baseId),next);}
+        if(current.current && mounted.current && !action.current&&!leaving.current){const next={...current.current,rows,reviewTime:timeInput};current.current=next;await keepAuditDraft(plugin,next);}
       });
       chain.current=write.catch(()=>{if(mounted.current)setError('Não foi possível guardar as alterações do rascunho.');});
     },300);
@@ -176,6 +181,28 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     try{await clear();onExit();}catch(e){setError(e instanceof Error?e.message:'Falha ao descartar.');}
     finally{action.current=false;if(mounted.current)setWorking(false);}
   }
+  async function leave() {
+    if(leaving.current)return;
+    leaving.current=true;closing.current=true;
+    // An exit must not wait for validation or a stalled SDK request. If saving
+    // is already in flight, its persisted draft/commit ID remains recoverable.
+    if(!current.current||action.current){onExit();return;}
+    const endedAt=Date.now();
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    try{
+      const save=chain.current.then(async()=>{
+        if(!mounted.current||!current.current)return;
+        const latest=current.current;
+        const end=latest.endedAt??endedAt;
+        const next:AuditDraft={...latest,phase:'summary',endedAt:end,
+          rows:latest.phase==='summary'?rows:simplifyAuditRows(auditRows(latest.cards,latest.histories,latest.startedAt,end,latest.issues),latest.cards),
+          reviewTime:latest.phase==='summary'?timeInput:defaultReviewTime(latest.practiceStartedAt,end,reviewedCardCounts(latest.cards,latest.histories,latest.startedAt,end))};
+        await keepAuditDraft(plugin,next);
+      });
+      await Promise.race([save,new Promise<void>((_,reject)=>{timer=setTimeout(()=>reject(new Error('timeout')),1500);})]);
+    }catch{void plugin.app.toast('Saindo sem registrar. Confira o rascunho pendente ao reabrir.').catch(()=>undefined);}
+    finally{clearTimeout(timer);onExit();}
+  }
   async function verifyCommit() {
     if(action.current||working)return;
     action.current=true;setWorking(true);
@@ -188,7 +215,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     }catch{setError('Ainda não foi possível verificar a gravação. Não registre manualmente até concluir esta conferência.');}
     finally{action.current=false;setWorking(false);}
   }
-  return {draft,rows,setRows,data,error,working,finish,confirm,discard,savedCount,uncertain,verifyCommit,timeInput,setTimeInput,auditId:id.current};
+  return {draft,rows,setRows,data,error,working,finish,confirm,discard,leave,savedCount,uncertain,verifyCommit,timeInput,setTimeInput,auditId:id.current};
 }
 
 export function QuestionAuditSummary({audit,titles}:{audit:ReturnType<typeof useQuestionAudit>;titles:Map<string,{title:string;subject:string}>}) {
