@@ -154,3 +154,6 @@ body:has(> :only-child .reading-tracker-panel) { margin: 0; }
   border-bottom: 1px solid var(--line);
 }
 .rt-lesson-nav label { flex: 1 1 180px; }
+.rt-phase-choices { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.reading-tracker-panel .rt-study-filters button[aria-pressed="true"] { color: var(--accent); background: var(--soft); border-color: var(--accent); }
+.rt-benefit-badge { padding: 3px 7px; border-radius: 6px; color: var(--success); background: var(--success-bg); width: fit-content; }

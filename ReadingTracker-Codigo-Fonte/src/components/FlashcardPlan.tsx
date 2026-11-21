@@ -5,12 +5,15 @@ import { loadReviewCards, reviewCandidates } from '../remnote/review-cards';
 import { buildReviewBlocks } from '../review-plan';
 import { remainingDailyTime } from '../study-sessions';
 import { studyDay } from '../resume';
+import { filterStudySubjects, type ReviewTagFilter } from '../study-scope';
 
-export function FlashcardPlan({ data, titles, onOpen, busy }: {
+export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag }: {
   data: Backup;
   titles: Map<string, { title: string; subject: string; subjectId: string }>;
   onOpen: (id: string) => void;
   busy: boolean;
+  paretoOnly: boolean;
+  tag?: ReviewTagFilter;
 }) {
   const plugin = usePlugin();
   const [grouped, setGrouped] = useState<Awaited<ReturnType<typeof loadReviewCards>>>();
@@ -18,6 +21,7 @@ export function FlashcardPlan({ data, titles, onOpen, busy }: {
   const [error, setError] = useState('');
   const [active, setActive] = useState<string[]>();
   const [revision, setRevision] = useState(0);
+  const [loadedScope, setLoadedScope] = useState('');
   const seconds = data.secondsPerCard ?? 30;
   const [day, setDay] = useState(studyDay);
   const budget = remainingDailyTime(data, day);
@@ -25,21 +29,25 @@ export function FlashcardPlan({ data, titles, onOpen, busy }: {
     const interval = setInterval(() => setDay(studyDay()), 30000);
     return () => clearInterval(interval);
   }, []);
-  const ids = [...titles.keys()].sort().join(',');
+  const subjects = new Map([...titles].map(([id, row]) => [id, row.subjectId]));
+  const ids = [...filterStudySubjects(data, subjects, 'all', paretoOnly).keys()].sort().join(',');
+  const scope = JSON.stringify([ids, tag?.id, tag?.includeInherited, day]);
+  const ready = loadedScope === scope && !loading;
   useEffect(() => {
     let current = true;
     setLoading(true);
     setError('');
     setGrouped(undefined);
-    void loadReviewCards(plugin, data.baseId, ids ? ids.split(',') : []).then((result) => {
-      if (current) setGrouped(result);
+    setActive(undefined);
+    void loadReviewCards(plugin, data.baseId, ids ? ids.split(',') : [], new Date(), tag).then((result) => {
+      if (current) { setGrouped(result); setLoadedScope(scope); }
     }).catch((cause) => {
       if (current) setError(cause instanceof Error ? cause.message : 'Falha ao consultar os flashcards.');
     }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [plugin, data.baseId, ids, revision, day]);
-  const blocks = useMemo(() => buildReviewBlocks(reviewCandidates(data, grouped ?? new Map()),
-    budget.review, seconds), [data, grouped, budget.review, seconds]);
+  }, [plugin, data.baseId, ids, revision, day, tag?.id, tag?.includeInherited]);
+  const blocks = useMemo(() => buildReviewBlocks(reviewCandidates(data, ready ? grouped ?? new Map() : new Map()),
+    budget.review, seconds), [data, grouped, budget.review, seconds, ready]);
   const total = blocks.reduce((sum, block) => sum + block.cards, 0);
 
   async function start(cardIds: string[]) {
@@ -50,15 +58,17 @@ export function FlashcardPlan({ data, titles, onOpen, busy }: {
   }
   return <section aria-label="Plano de revisão com flashcards">
     <h3>Revisar antes de avançar</h3>
+    <p>{paretoOnly ? 'Núcleo de 80% da incidência · ' : ''}{tag ? 'Tag · ' + tag.title +
+      (tag.includeInherited ? ' · inclui herança' : ' · marcação direta') : 'Todas as tags'}</p>
     <p>Até {budget.review} min · {seconds} s por flashcard · {total} cartões nos blocos sugeridos</p>
     <button type="button" disabled={busy || loading || !!active} onClick={() => setRevision((value) => value + 1)}>
       {loading ? 'Consultando flashcards…' : 'Atualizar blocos'}
     </button>
     {error && <p role="alert">{error}</p>}
-    {!loading && grouped && blocks.length === 0 && <p>Nenhum cartão com data de revisão até hoje cabe no orçamento das aulas cadastradas.</p>}
+    {!loading && grouped && blocks.length === 0 && <p>Nenhum flashcard pendente encontrado para os filtros e o tempo disponíveis.</p>}
     <p>Estimativa pelos cartões com data até hoje, incluindo atrasados. Cartões novos sem data ficam fora da contagem.
       A prática pode reapresentar cartões e alterar a duração.</p>
-    {active ? <div>
+    {active && ready ? <div>
       <button type="button" onClick={() => { setActive(undefined); setRevision((value) => value + 1); }}>Voltar ao plano e atualizar</button>
       <Queue key={active.join(',')} cardIds={active} height={480} width="100%" />
     </div> : <ul>{blocks.map((block, index) => <li className="rt-row" key={index}>

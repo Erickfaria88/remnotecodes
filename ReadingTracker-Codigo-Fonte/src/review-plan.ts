@@ -4,6 +4,7 @@ export interface ReviewCandidate {
   overdue: boolean;
   reviewDue: boolean;
   accuracy: number | null;
+  incidence?: number;
 }
 
 export function reviewBudget(dailyMinutes: number, share: number) {
@@ -17,6 +18,7 @@ export function buildReviewBlocks(candidates: ReviewCandidate[], minutes: number
   const minimum = Math.max(1, Math.floor(15 * 60 / secondsPerCard));
   const ordered = [...candidates].sort((a, b) =>
     Number(b.reviewDue) - Number(a.reviewDue) || Number(b.overdue) - Number(a.overdue) ||
+    (b.incidence ?? 0) / Math.max(1, b.cardIds.length) - (a.incidence ?? 0) / Math.max(1, a.cardIds.length) ||
     (a.accuracy ?? 1) - (b.accuracy ?? 1) || a.cardIds.length - b.cardIds.length || a.id.localeCompare(b.id));
   const blocks: { lessons: { id: string; cardIds: string[] }[]; cards: number; minutes: number }[] = [];
   const seen = new Set<string>();

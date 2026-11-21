@@ -59,7 +59,8 @@ test('consulta cartões devidos de descendentes, exclui futuros e prática desat
     { _id: 'disabled', remId: 'disabled', nextRepetitionTime: today, type: 'forward' },
   ];
   const rems = [
-    { _id: 'child', parent: 'lesson', getEnablePractice: async () => true, getPracticeDirection: async () => 'both' },
+    { _id: 'child', parent: 'lesson', getEnablePractice: async () => true, getPracticeDirection: async () => 'both',
+      getTagRems: async () => [{ _id: 'focus' }], ancestorTagRem: async () => [{ _id: 'focus' }, { _id: 'inherited' }] },
     { _id: 'disabled', parent: 'lesson', getEnablePractice: async () => false, getPracticeDirection: async () => 'both' },
     { _id: 'lesson', parent: null },
   ];
@@ -70,5 +71,8 @@ test('consulta cartões devidos de descendentes, exclui futuros e prática desat
   } as unknown as RNPlugin;
   const result = await loadReviewCards(plugin, 'base', ['lesson'], now);
   assert.deepEqual(result.get('lesson'), { cardIds: ['due', 'late'], overdue: true });
+  assert.equal((await loadReviewCards(plugin, 'base', ['lesson'], now, { id: 'focus', includeInherited: false })).get('lesson')?.cardIds.length, 2);
+  assert.equal((await loadReviewCards(plugin, 'base', ['lesson'], now, { id: 'inherited', includeInherited: false })).size, 0);
+  assert.equal((await loadReviewCards(plugin, 'base', ['lesson'], now, { id: 'inherited', includeInherited: true })).get('lesson')?.cardIds.length, 2);
   await assert.rejects(loadReviewCards(plugin, 'other', ['lesson'], now));
 });

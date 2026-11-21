@@ -2,8 +2,10 @@ import type { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import type { Backup } from './storage';
 import type { ReviewCandidate } from '../review-plan';
 import { studyDay } from '../resume';
+import type { ReviewTagFilter } from '../study-scope';
 
-export async function loadReviewCards(plugin: RNPlugin, baseId: string, lessonIds: string[], now = new Date()) {
+export async function loadReviewCards(plugin: RNPlugin, baseId: string, lessonIds: string[], now = new Date(),
+  tag?: Pick<ReviewTagFilter, 'id' | 'includeInherited'>) {
   if ((await plugin.kb.getCurrentKnowledgeBaseData())._id !== baseId) throw new Error('A base ativa mudou.');
   const lessons = new Set(lessonIds);
   if (!lessons.size) return new Map<string, { cardIds: string[]; overdue: boolean }>();
@@ -32,24 +34,33 @@ export async function loadReviewCards(plugin: RNPlugin, baseId: string, lessonId
   }
   const enabled = new Map<string, boolean>();
   const directions = new Map<string, string>();
+  const owners = new Map<string, string>();
+  for (const remId of ids) {
+    let id: string | null | undefined = remId;
+    const seen = new Set<string>();
+    while (id && !lessons.has(id) && !seen.has(id)) { seen.add(id); id = cache.get(id)?.parent; }
+    if (id && lessons.has(id)) owners.set(remId, id);
+  }
+  const tagged = new Set<string>();
   for (let offset = 0; offset < ids.length; offset += 16) {
     await Promise.all(ids.slice(offset, offset + 16).map(async (id) => {
       const rem = cache.get(id);
+      if (!owners.has(id)) return;
       enabled.set(id, rem ? await rem.getEnablePractice() : false);
       if (rem) directions.set(id, await rem.getPracticeDirection());
+      if (rem && tag && enabled.get(id)) {
+        const tags = tag.includeInherited ? await rem.ancestorTagRem() : await rem.getTagRems();
+        if (tags.some((row) => row._id === tag.id)) tagged.add(id);
+      }
     }));
   }
   const grouped = new Map<string, { cardIds: string[]; overdue: boolean }>();
   for (const card of due) {
     if (!enabled.get(card.remId)) continue;
+    if (tag && !tagged.has(card.remId)) continue;
     const direction = directions.get(card.remId);
     if (typeof card.type === 'string' && direction !== 'both' && direction !== card.type) continue;
-    let id: string | null | undefined = card.remId;
-    const visited = new Set<string>();
-    while (id && !lessons.has(id) && !visited.has(id)) {
-      visited.add(id);
-      id = cache.get(id)?.parent;
-    }
+    const id = owners.get(card.remId);
     if (!id || !lessons.has(id)) continue;
     const group = grouped.get(id) ?? { cardIds: [], overdue: false };
     group.cardIds.push(card._id);
@@ -68,6 +79,7 @@ export function reviewCandidates(data: Backup, grouped: Map<string, { cardIds: s
       id, ...row,
       reviewDue: Object.values(data.reviews).some((review) => review.lessonId === id && !review.doneOn && review.dueOn <= today),
       accuracy: result ? result.correct / (result.correct + result.incorrect) : null,
+      incidence: data.lessons[id]?.incidence,
     };
   });
 }
