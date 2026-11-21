@@ -157,3 +157,41 @@ body:has(> :only-child .reading-tracker-panel) { margin: 0; }
 .rt-phase-choices { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
 .reading-tracker-panel .rt-study-filters button[aria-pressed="true"] { color: var(--accent); background: var(--soft); border-color: var(--accent); }
 .rt-benefit-badge { padding: 3px 7px; border-radius: 6px; color: var(--success); background: var(--success-bg); width: fit-content; }
+.rt-exam-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px; margin: 12px 0; }
+.rt-exam-summary { padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+.rt-exam-summary h3 { margin-top: 0; }
+.rt-exam-editor { display: grid; gap: 14px; }
+.rt-exam-editor fieldset { display: grid; gap: 12px; min-width: 0; border: 0; padding: 0; }
+.rt-exam-links { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 8px; }
+.rt-exam-search { max-height: 240px; overflow: auto; padding-left: 20px; }
+.rt-preparation-mode { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.rt-preparation-mode label { flex: 1 1 260px; }
+.rt-preparation-mode p { flex: 2 1 280px; }
+.reading-tracker-panel .rt-tabs { flex-wrap: wrap; }
+.reading-tracker-panel progress { width: 100%; }
+/* The practice portal fills the widget, bypassing dashboard cards and gutters. */
+html.rt-reviewing .reading-tracker-panel:not(.rt-review-practice) { display: none; }
+html.rt-reviewing body { margin: 0; }
+html.rt-reviewing .reading-tracker-panel.rt-review-practice {
+  display: block;
+  max-block-size: none;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px 10px;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+.rt-review-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 48px;
+  padding: 4px 6px 8px;
+  background: var(--canvas);
+}
+.rt-review-queue { width: 100%; min-width: 0; }

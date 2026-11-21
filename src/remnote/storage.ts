@@ -10,9 +10,10 @@ import { validStudySteps, type StudyStep } from '../study-steps';
 import { validExerciseResult, type ExerciseResult } from '../exercise-results';
 import { validIncidence } from '../pareto';
 import { validSession, type StudySession } from '../study-sessions';
+import { parsePreparation, type Preparation } from '../exam-preparation';
 
 export interface Backup {
-  version: 1;
+  version: 2;
   baseId: string;
   lessons: Record<string, ReadingRecord>;
   globalPace: number | null;
@@ -25,6 +26,7 @@ export interface Backup {
   reviewShare?: number;
   secondsPerCard?: number;
   sessions?: Record<string, StudySession>;
+  preparation?: Preparation;
 }
 
 interface SyncedStorage {
@@ -42,10 +44,11 @@ function validId(id: string) {
 }
 
 export function parseBackup(value: unknown, baseId: string): Backup {
-  if (!isObject(value) || value.version !== 1 || typeof value.baseId !== 'string') {
+  if (!isObject(value) || ![1, 2].includes(value.version as number) || typeof value.baseId !== 'string') {
     throw new Error('Backup inválido ou versão incompatível.');
   }
   if (value.baseId !== baseId) throw new Error('Este backup pertence a outra base do RemNote.');
+  if (value.version === 2 && value.preparation === undefined) throw new Error('Cadastro de preparação ausente no backup.');
   if (!isObject(value.lessons) || !isObject(value.subjectPaces) ||
       (value.globalPace !== null && !validPace(value.globalPace))) {
     throw new Error('Estrutura de backup inválida.');
@@ -135,8 +138,8 @@ export function parseBackup(value: unknown, baseId: string): Backup {
       sessions[id] = { ...row };
     }
   }
-  return { version: 1, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, sessions,
-    reviewShare, secondsPerCard, ...(value.dailyMinutesCustomized === true ? { dailyMinutesCustomized: true as const } : {}) };
+  return { version: 2, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, sessions,
+    reviewShare, secondsPerCard, preparation: parsePreparation(value.preparation), ...(value.dailyMinutesCustomized === true ? { dailyMinutesCustomized: true as const } : {}) };
 }
 
 function migrateDailyDefault(value: unknown) {
@@ -210,6 +213,7 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
   return {
     load,
     saveStudy,
+    savePreparation: (preparation: Preparation) => write(async () => ({ ...await load(), preparation: parsePreparation(preparation) })),
     updateSession: (id: string, changes: Pick<StudySession, 'day' | 'category' | 'seconds' | 'counted' | 'note'>) => write(async () => {
       const data = await load();
       const previous = data.sessions?.[id];

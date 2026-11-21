@@ -14,7 +14,7 @@ import { readingQueue, studyDay } from '../resume';
 import { filterStudySubjects, type PhaseSelection, type ReviewTagFilter } from '../study-scope';
 
 export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onReviews, busy, reviewOnly = false,
-  phaseSelection, paretoOnly, reviewTag }: {
+  phaseSelection, paretoOnly, reviewTag, allowedLessonIds, reviewPriorities }: {
   plugin: RNPlugin; data: Backup; busy: boolean; onSelect: (id: string) => void; onOpen: (id: string) => void;
   onPublish: (tasks: DailyTask[], day: string) => Promise<boolean>;
   onReviews: () => void;
@@ -22,6 +22,8 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   phaseSelection: PhaseSelection;
   paretoOnly: boolean;
   reviewTag?: ReviewTagFilter;
+  allowedLessonIds?: Set<string>;
+  reviewPriorities?: Record<string,number>;
 }) {
   const [allTitles, setTitles] = useState<Map<string, { title: string; subject: string; subjectId: string }>>();
   const [failed, setFailed] = useState(false);
@@ -65,7 +67,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     return () => { active = false; };
   }, [plugin, data]);
 
-  const allSubjects = new Map(Array.from(allTitles ?? [], ([id, entry]) => [id, entry.subjectId]));
+  const allSubjects = new Map(Array.from(allTitles ?? [], ([id, entry]) => [id, entry.subjectId] as const).filter(([id]) => !allowedLessonIds || allowedLessonIds.has(id)));
   const subjects = filterStudySubjects(data, allSubjects, phaseSelection);
   const titles = allTitles && new Map([...allTitles].filter(([id]) => subjects.has(id)));
   const studyMinutes = remainingDailyTime(data, today).study;
@@ -96,7 +98,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
 
   if (reviewOnly) return <section className="rt-card" aria-label="Blocos de revisão">
     {failed ? <p role="alert">Não foi possível consultar as aulas.</p> : !titles ? <p>Carregando aulas…</p> :
-      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} />}
+      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} priorities={reviewPriorities} />}
   </section>;
 
   return <section className="rt-card" aria-label="Retomar estudos">

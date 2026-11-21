@@ -7,6 +7,8 @@ import type { SessionInput } from '../study-sessions';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { SubjectPicker } from '../components/SubjectPicker';
 import { StudyFilters } from '../components/StudyFilters';
+import { ExamDashboard, ExamManager } from '../components/ExamPreparation';
+import { emptyPreparation, examLessonIds, examReviewPriorities, type Preparation } from '../exam-preparation';
 import { filterStudySubjects, type PhaseSelection, type ReviewTagFilter } from '../study-scope';
 import { validPhase } from '../recommendations';
 import { PhasedSubjects } from '../components/PhasedSubjects';
@@ -91,7 +93,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const plugin = usePlugin();
   const repository = useMemo(() => createRepository(plugin.storage, baseId), [plugin, baseId]);
   const [data, setData] = useState<Backup>();
-  const [view, setView] = useState<'resume' | 'subjects' | 'settings' | 'agenda' | 'exercises'>('resume');
+  const [view, setView] = useState<'resume' | 'subjects' | 'settings' | 'agenda' | 'exercises' | 'exams'>('resume');
   const [phaseSelection, setPhaseSelection] = useState<PhaseSelection>('auto');
   const [paretoOnly, setParetoOnly] = useState(false);
   const [reviewTag, setReviewTag] = useState<ReviewTagFilter>();
@@ -171,6 +173,17 @@ function BaseTracker({ baseId }: { baseId: string }) {
     }
   }
 
+  async function savePreparation(preparation: Preparation) {
+    if (action.current || busy) throw new Error('Aguarde a operação atual.');
+    action.current = true; setBusy(true); setError(''); setStatus('');
+    try {
+      await verifyBase(plugin, baseId);
+      setData(await repository.savePreparation(preparation));
+      setStatus('Preparação salva. As aulas e os registros existentes foram preservados.');
+    } catch (cause) { setError(errorText(cause)); throw cause; }
+    finally { action.current = false; setBusy(false); }
+  }
+
   function selectSubject(next: Subject) {
     void run(async () => {
       const items = await loadLessons(plugin, next.rem._id);
@@ -235,7 +248,10 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const record = lesson && data?.lessons[lesson.rem._id];
   const subjectPace = subjectId ? data?.subjectPaces[subjectId] : undefined;
   const pace = effectivePace(data?.globalPace ?? null, subjectPace);
-  const reviewScope = data ? filterStudySubjects(data, scopeSubjects, phaseSelection, paretoOnly) : new Map<string, string>();
+  const preparation = data?.preparation ?? emptyPreparation();
+  const post = preparation.mode === 'post';
+  const postLessons = examLessonIds(preparation);
+  const reviewScope = post ? postLessons : data ? filterStudySubjects(data, scopeSubjects, phaseSelection, paretoOnly) : new Map<string, string>();
   const scopedReviews = Object.fromEntries(Object.entries(data?.reviews ?? {}).filter(([, row]) => reviewScope.has(row.lessonId)));
 
   async function saveLesson(progress: Progress | undefined, resumeOn: string | null, stars: number | null,
@@ -318,12 +334,21 @@ function BaseTracker({ baseId }: { baseId: string }) {
         <button type="button" aria-pressed={view === 'subjects'} onClick={() => setView('subjects')}>Disciplinas</button>
         <button type="button" aria-pressed={view === 'agenda'} onClick={() => setView('agenda')}>Revisões</button>
         <button type="button" aria-pressed={view === 'exercises'} onClick={() => setView('exercises')}>Exercícios</button>
+        <button type="button" aria-pressed={view === 'exams'} onClick={() => setView('exams')}>Concursos</button>
         <button type="button" aria-pressed={view === 'settings'} onClick={() => setView('settings')}>Ajustes</button>
       </nav>}
     </header>
+    {data && !collapsed && <section className="rt-card rt-preparation-mode" aria-label="Modo de preparação">
+      <label>Preparação<select disabled={busy} value={preparation.mode}
+        onChange={(event) => void savePreparation({ ...preparation, mode: event.target.value as Preparation['mode'] }).catch(() => undefined)}>
+        <option value="normal">Normal · fases e preparação contínua</option>
+        <option value="post">Pós-edital · concursos ativos</option>
+      </select></label>
+      <p>{post ? 'Sugestões e revisões seguem os editais ativos. O progresso das aulas e o saldo diário continuam compartilhados.' : 'Suas fases e prioridades habituais continuam valendo. Os editais ficam cadastrados na aba Concursos.'}</p>
+    </section>}
     {data && (view === 'resume' || view === 'agenda') && <StudyFilters plugin={plugin}
       phases={data.subjectPhases} selection={phaseSelection} onPhases={setPhaseSelection}
-      paretoOnly={paretoOnly} onPareto={setParetoOnly} tag={reviewTag} onTag={setReviewTag} />}
+      paretoOnly={paretoOnly} onPareto={setParetoOnly} tag={reviewTag} onTag={setReviewTag} tagsOnly={post} />}
     {collapsed && <div className="rt-dashboard-progress">
       <DocumentProgress location={WidgetLocation.DocumentBelowTitle} paneId={lessonPaneId} />
     </div>}
@@ -333,13 +358,16 @@ function BaseTracker({ baseId }: { baseId: string }) {
       Recarregar progresso
     </button>}
     {data && <div hidden={view !== 'resume'} className="rt-view">
-      {view === 'resume' && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume}
+      {view === 'resume' && post && <ExamDashboard plugin={plugin} data={data} busy={busy} onSelect={selectResume} onOpen={openResume}
+        onManage={() => setView('exams')} onSave={savePreparation} reviewTag={reviewTag} />}
+      {view === 'resume' && !post && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume}
         onReviews={() => setView('agenda')} busy={busy} phaseSelection={phaseSelection} paretoOnly={paretoOnly} reviewTag={reviewTag} />}
     </div>}
     {data && <div hidden={view !== 'agenda'} className="rt-view">
-      {view === 'agenda' && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume}
+      {view === 'agenda' && <ResumePanel plugin={plugin} data={post ? {...data, dailyMinutes: preparation.availability[studyDay()] ?? data.dailyMinutes} : data} onSelect={selectResume} onOpen={openResume}
         onPublish={publishResume} onReviews={() => setView('agenda')} busy={busy} reviewOnly
-        phaseSelection={phaseSelection} paretoOnly={paretoOnly} reviewTag={reviewTag} />}
+        phaseSelection={post ? 'all' : phaseSelection} paretoOnly={post ? false : paretoOnly} reviewTag={reviewTag}
+        allowedLessonIds={post ? postLessons : undefined} reviewPriorities={post ? examReviewPriorities(preparation) : undefined} />}
       {scopeError && <p role="alert">{scopeError}</p>}
       <ReviewAgenda reviews={scopedReviews} busy={busy} onOpen={openResume}
         onAdd={() => { setView('subjects'); setStatus('Escolha a aula e abra Adicionar estudo à agenda.'); }}
@@ -357,6 +385,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
           setStatus('Revisão reagendada.');
         })} />
     </div>}
+    {data && view === 'exams' && <ExamManager plugin={plugin} data={data} busy={busy} onSave={savePreparation} />}
     {data && <div hidden={view !== 'exercises'} className="rt-view">
       <section className="rt-card" aria-label="Exercícios">
         <h2>Exercícios</h2>

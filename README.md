@@ -28,9 +28,38 @@ Você pode usar os nomes que preferir para os documentos. O plugin associa os re
 | **Disciplinas** | Cadastre o progresso das aulas e organize as disciplinas em Fase 1, Fase 2 e assim por diante. |
 | **Revisões** | Consulte revisões agendadas, abra a aula, conclua ou reagende a revisão. |
 | **Exercícios** | Selecione uma aula e registre novos acertos e erros junto com os demais campos do estudo. |
+| **Concursos** | Cadastre editais, datas, pesos, mínimos e assuntos; vincule aulas e ative os concursos que deseja preparar juntos. |
 | **Ajustes** | Defina o tempo diário, o ritmo de leitura e exporte ou restaure um backup JSON. |
 
 O botão **Abrir aula** leva ao documento no RemNote. Ao abrir uma aula pelo dashboard, o painel é recolhido e mantém um botão para expandir novamente. O resumo disponível da aula mostra páginas, etapas e desempenho em questões.
+
+## Preparação normal e pós-edital · versão 0.1.17
+
+O seletor **Preparação** fica acima das abas de conteúdo. **Normal** preserva a preparação contínua por fases. **Pós-edital** substitui as sugestões de Retomar por um plano dos editais ativos e limita Revisões às aulas vinculadas. Trocar o modo não apaga fases, progresso, exercícios ou histórico. O saldo diário é único: estudar no modo normal também consome o tempo disponível no pós-edital.
+
+1. Em **Concursos**, clique em **Cadastrar edital**, informe nome, banca e data da prova. A prioridade entre concursos vai de 1 a 5.
+2. Adicione cada disciplina com número de questões e peso por questão. Informe mínimos percentuais, se existirem. Para mínimos por bloco, cadastre o bloco e associe suas disciplinas. Regras gerais e penalizações ficam registradas para consulta; a pontuação líquida não é calculada a partir dos exercícios acumulados.
+3. Adicione os assuntos do conteúdo programático. Informe a incidência do levantamento dos professores e sua fonte, ou deixe em branco quando desconhecida. Assuntos devem representar parcelas distintas do levantamento. Um assunto que abrange várias aulas deve ser cadastrado uma vez com todas elas vinculadas.
+4. Use **Buscar aulas** para vincular documentos existentes. Confira o documento-pai nos resultados para evitar homônimos. O vínculo usa o ID da aula. Escolha **Essencial**, **Desejável** ou **Se houver tempo** para ajustar a prioridade.
+5. Salve o edital e selecione **Pós-edital**. Em Retomar, confira o saldo, a revisão, as sugestões e os avisos de cadastro. Cadastre o ritmo e as páginas na aula para melhorar as estimativas.
+
+Você pode ter dois ou mais editais ativos. Vincule a mesma aula nos editais que compartilham conteúdo. A cobertura é atualizada em todos eles, mas o plano conta a aula e o tempo uma única vez. **Usar como base para outro edital** copia o cadastro em edição, mantendo os vínculos; ajuste data, pesos e conteúdo e salve para criar o novo concurso. Arquivar ou excluir um edital preserva as aulas e os registros. Provas no dia atual ou no passado saem das sugestões.
+
+O plano protege lacunas de preparação em disciplinas com mínimos e depois combina peso, incidência, proximidade da prova, prioridade do concurso, estrelas, retomada, conclusões rápidas e necessidade de questões por minuto. Questões usam meta de acerto e amostra mínima configuráveis, evitando tratar duas questões certas como domínio. O núcleo de 80% é calculado por disciplina e inclui essenciais e disciplinas com mínimos. Totais inconsistentes e incidência parcial ficam sinalizados. Incidência ausente nunca vira cobertura conhecida.
+
+O orçamento usa o tempo e a reserva de revisão de Ajustes (por padrão 270 min: 90 de revisão e 180 de avanço/questões), descontando as sessões registradas. Cada leitura recebe até 30 min e cada bloco de questões até 20 min, com até 60 min por disciplina no plano. Em **Metas de questões e disponibilidade por data**, cadastre exceções de tempo, incluindo zero para folgas. O dia da prova não entra na projeção.
+
+**Cobertura completa** estima a leitura conhecida e uma rodada inicial de questões. **Cobertura prioritária** considera núcleo, essenciais e mínimos. **Plano possível** simula a distribuição diária entre todos os editais ativos e mostra, na data de cada prova, a leitura projetada e o trabalho conhecido que ficou pendente. A simulação não grava progresso futuro; recalcula com os dados reais. Cenários de esforço por prazo incluem os editais com prova até aquele prazo; a projeção diária considera todos os ativos. Aulas compartilhadas não duplicam esforço. Assuntos sem material ou ritmo ficam como lacunas. O horizonte máximo da projeção é 730 dias.
+
+Cobertura significa avanço de leitura ponderado pelos percentuais cadastrados, não domínio, nota prevista ou chance de aprovação. As etapas exigem todas as aulas do assunto concluídas naquela etapa. As questões acumuladas são compartilhadas, sem separação por banca; não comprovam mínimos eliminatórios. Uma rodada sugerida de 20 min não garante domínio. O algoritmo é uma heurística de prioridade e não garante o ótimo matemático. Revisões usam o agendamento nativo e podem variar de duração.
+
+### Dados e atualização
+
+Os cadastros ficam no armazenamento sincronizado do SDK, separados pelo ID da base, e são incluídos no backup JSON. O formato de dados passa para versão 2; backups da versão 1 são lidos e convertidos em memória. A gravação acontece ao salvar uma alteração. Versões antigas do plugin recusam o formato 2, evitando descartar os novos cadastros: atualize todas as máquinas e o código localhost antes de continuar salvando. A chave de armazenamento é mantida para preservar os dados existentes. Não há alterações automáticas em documentos, tags, hierarquia ou flashcards pelo cadastro de editais.
+
+### Verificar no RemNote
+
+Teste primeiro em uma base de testes: cadastre duas provas futuras e vincule uma mesma aula a ambas. Salve páginas e questões pelo formulário e confirme que as duas coberturas mudam, com uma só atividade no plano. Troque para Normal e confira suas fases. Volte para Pós-edital, registre tempo, teste um dia com disponibilidade zero e confira o saldo e as projeções. Exporte e restaure o JSON na mesma base. A importação assistida de edital, os simulados e a comparação entre concursos não fazem parte desta versão.
 
 ## Registre exercícios sem perder o total
 
@@ -126,4 +155,8 @@ Em Disciplinas, use Selecionar disciplina ou Trocar disciplina. A janela permite
 Em Retomar e Revisões, comece por Prioridades de hoje. Selecione uma ou mais fases ou Todas as fases. A seleção filtra atenção, cobertura, revisões e avanço. O núcleo de 80% é calculado separadamente por disciplina. Leituras curtas selecionadas no plano recebem o destaque Melhor custo-benefício.
 
 Para revisar somente os flashcards de uma tag, abra Filtrar flashcards por tag, use Erro, Foco, 80/20 ou Base Teórica como atalho de busca e selecione a tag correta nos resultados. O filtro usa o ID da tag, sem exigir mudança de nome. A marcação direta é o padrão; marque Incluir tags herdadas dos tópicos-pai quando necessário. Os blocos usam apenas cartões pendentes das aulas selecionadas. O filtro de tag afeta os blocos de flashcards, não os lembretes manuais de revisão. As escolhas são mantidas entre as abas do painel aberto; recarregar ou abrir outro painel reinicia os filtros. O orçamento diário continua único, independentemente das fases selecionadas.
+
+
+## Prática ampliada · versão 0.1.18
+Ao iniciar Revisar bloco, a área de resolução ocupa toda a largura do widget, com margens pequenas, e oculta temporariamente o dashboard. No documento, a altura é ampliada com base na área disponível do monitor, reservando espaço para os controles do aplicativo. Na barra lateral, a prática se adapta à altura disponível do painel. O botão Voltar ao plano fica no topo; ao sair, os blocos são atualizados. Os controles nativos de resolução continuam disponíveis. A ampliação fica limitada ao widget do plugin, sem manipular a janela do RemNote.
 
