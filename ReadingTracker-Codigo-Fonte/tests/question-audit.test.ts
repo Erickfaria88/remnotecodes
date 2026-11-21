@@ -1,9 +1,9 @@
 import {test} from 'node:test';
 import {strict as assert} from 'node:assert';
 import type {RNPlugin} from '@remnote/plugin-sdk';
-import {outcome,historyDelta,auditRows,approvedEntries,tecQuestionKeys,type AuditCard,type AuditBatch} from '../src/question-audit';
+import {outcome,historyDelta,auditRows,approvedEntries,tecQuestionKeys,simplifyAuditRows,selectedAuditRows,type AuditCard,type AuditBatch} from '../src/question-audit';
 import {createRepository,parseBackup} from '../src/remnote/storage';
-import {auditDraftKey,prepareAudit,refreshAudit,validDraft,readHistory,claimAudit,releaseAudit} from '../src/remnote/question-audit';
+import {auditDraftKey,prepareAudit,refreshAudit,validDraft,readHistory,claimAudit,releaseAudit,stableAuditRecovery,type AuditDraft} from '../src/remnote/question-audit';
 import {studyDay} from '../src/resume';
 const t=Date.now()-3*86400000;
 const baseline=[{date:t-86400000,score:1}];
@@ -116,4 +116,42 @@ test('duas telas não recuperam simultaneamente o mesmo bloco e outra base não 
   await releaseAudit(sdk,'base','audit1','screen2');await assert.rejects(()=>claimAudit(sdk,'base','audit1','screen2'));
   await releaseAudit(sdk,'base','audit1','screen1');await claimAudit(sdk,'base','audit1','screen2');
   base='other';await assert.rejects(()=>claimAudit(sdk,'base','audit1','screen2'));
+});
+
+test('questão de livro sem TEC usa o tópico quando resposta e aula são confirmadas',()=>{
+  const source={...card(),questionKey:undefined,identityIssue:'Sem link TEC.',allowCardIdentity:true};
+  const rows=simplifyAuditRows(auditRows([source],{c1:[...baseline,{date:t+10,score:0}]},t,t+100),[source]);
+  assert.equal(rows[0].include,true);assert.equal(rows[0].questionKey,'rem:rem_c1');assert.equal(rows[0].recordByCard,true);
+  assert.equal(approvedEntries(rows)[0].correct,false);
+});
+test('simplificação não inclui resposta ausente ou incerta, nem flashcard comum sem identidade',()=>{
+  const source={...card(),questionKey:undefined,identityIssue:'Sem link TEC.',allowCardIdentity:true};
+  const untouched=simplifyAuditRows(auditRows([source],{c1:baseline},t,t+100),[source]);assert.equal(untouched[0].include,false);
+  const uncertain=simplifyAuditRows(auditRows([source],{c1:[...baseline,{date:t+10,score:1}]},t,t+100,{c1:'Histórico alterado.'}),[source]);assert.equal(uncertain[0].include,false);
+  const normal={...source,allowCardIdentity:false};assert.equal(simplifyAuditRows(auditRows([normal],{c1:[...baseline,{date:t+10,score:1}]},t,t+100),[normal])[0].include,false);
+});
+test('cartões do mesmo tópico sem TEC são agrupados, preservando o primeiro erro',()=>{
+  const sources=[{...card(),questionKey:undefined,identityIssue:'Sem link TEC.',allowCardIdentity:true},
+    {...card('c2'),remId:'rem_c1',questionKey:undefined,identityIssue:'Sem link TEC.',allowCardIdentity:true}];
+  const histories={c1:[...baseline,{date:t+10,score:0}],c2:[...baseline,{date:t+20,score:1}]};
+  const rows=simplifyAuditRows(auditRows(sources,histories,t,t+100),sources);
+  assert.equal(rows.length,1);assert.equal(rows[0].correct,false);assert.equal(rows[0].responses,2);
+  sources[0].baseline=[{date:t-100,score:0}];histories.c1=[...sources[0].baseline];
+  const prior=simplifyAuditRows(auditRows(sources,histories,t,t+100),sources);assert.equal(prior.some(r=>r.include),false);
+});
+test('totais e gravação consideram somente as aulas selecionadas e excluem questão já contada',()=>{
+  const a=row(1);const b={...row(0),id:'b',lessonId:'other',questionKey:'tec:999'};
+  assert.equal(selectedAuditRows([a,b],['lesson'],new Set()).length,1);
+  assert.equal(selectedAuditRows([a,b],[],new Set()).length,0);
+  const known=new Set([studyDay(0,new Date(a.at!))+'|'+a.questionKey]);
+  assert.equal(selectedAuditRows([a,b],['lesson','other'],known).length,1);
+});
+test('rascunho finalizado e inalterado mantém respostas, mas interrupção ou alteração exige conferência',()=>{
+  const previous={phase:'summary',endedAt:t+100,histories:{c1:[{date:t+10,score:1}]}} as unknown as AuditDraft;
+  assert.equal(stableAuditRecovery(previous,{...previous}),true);
+  assert.equal(stableAuditRecovery({...previous,phase:'running'},{...previous}),false);
+  assert.equal(stableAuditRecovery(previous,{...previous,histories:{c1:[{date:t+20,score:0}]}}),false);
+  const legacy={...card(),title:'📖 Julgue o item',questionKey:undefined,identityIssue:'Sem link TEC nos ancestrais do cartão. O ícone de livro sozinho não identifica uma questão.'};
+  const rows=simplifyAuditRows(auditRows([legacy],{c1:[...baseline,{date:t+10,score:1}]},t,t+100),[legacy]);
+  assert.equal(rows[0].include,true);
 });
