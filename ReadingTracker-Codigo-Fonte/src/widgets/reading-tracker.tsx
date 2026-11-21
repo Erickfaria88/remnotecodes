@@ -7,6 +7,7 @@ import type { SessionInput } from '../study-sessions';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { SubjectPicker } from '../components/SubjectPicker';
 import { StudyFilters } from '../components/StudyFilters';
+import { AuditHistory } from '../components/AuditHistory';
 import { ExamDashboard, ExamManager } from '../components/ExamPreparation';
 import { emptyPreparation, examLessonIds, examReviewPriorities, type Preparation } from '../exam-preparation';
 import { filterStudySubjects, type PhaseSelection, type ReviewTagFilter } from '../study-scope';
@@ -359,15 +360,15 @@ function BaseTracker({ baseId }: { baseId: string }) {
     </button>}
     {data && <div hidden={view !== 'resume'} className="rt-view">
       {view === 'resume' && post && <ExamDashboard plugin={plugin} data={data} busy={busy} onSelect={selectResume} onOpen={openResume}
-        onManage={() => setView('exams')} onSave={savePreparation} reviewTag={reviewTag} />}
+        onManage={() => setView('exams')} onSave={savePreparation} reviewTag={reviewTag} onResultsSaved={setData} />}
       {view === 'resume' && !post && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume}
-        onReviews={() => setView('agenda')} busy={busy} phaseSelection={phaseSelection} paretoOnly={paretoOnly} reviewTag={reviewTag} />}
+        onReviews={() => setView('agenda')} busy={busy} phaseSelection={phaseSelection} paretoOnly={paretoOnly} reviewTag={reviewTag} onResultsSaved={setData} />}
     </div>}
     {data && <div hidden={view !== 'agenda'} className="rt-view">
       {view === 'agenda' && <ResumePanel plugin={plugin} data={post ? {...data, dailyMinutes: preparation.availability[studyDay()] ?? data.dailyMinutes} : data} onSelect={selectResume} onOpen={openResume}
         onPublish={publishResume} onReviews={() => setView('agenda')} busy={busy} reviewOnly
         phaseSelection={post ? 'all' : phaseSelection} paretoOnly={post ? false : paretoOnly} reviewTag={reviewTag}
-        allowedLessonIds={post ? postLessons : undefined} reviewPriorities={post ? examReviewPriorities(preparation) : undefined} />}
+        allowedLessonIds={post ? postLessons : undefined} reviewPriorities={post ? examReviewPriorities(preparation) : undefined} onResultsSaved={setData} />}
       {scopeError && <p role="alert">{scopeError}</p>}
       <ReviewAgenda reviews={scopedReviews} busy={busy} onOpen={openResume}
         onAdd={() => { setView('subjects'); setStatus('Escolha a aula e abra Adicionar estudo à agenda.'); }}
@@ -397,6 +398,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
         </label>}
         <button type="button" onClick={() => setView('subjects')}>Escolher disciplina</button>
       </section>
+      <AuditHistory data={data}/>
     </div>}
     {data && <div hidden={view !== 'subjects'} className="rt-view">
       <div className="rt-card rt-subject-heading">
@@ -462,7 +464,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
               setStatus('Revisão agendada.');
             })} />
           {record && <LessonMetrics progress={record} pace={pace} />}
-          <SessionHistory sessions={data.sessions ?? {}} lessonId={lesson.rem._id} busy={busy}
+          <SessionHistory auditBatches={data.auditBatches} sessions={data.sessions ?? {}} lessonId={lesson.rem._id} busy={busy}
             onSave={(id, changes) => run(async () => { setData(await repository.updateSession(id, changes)); setStatus('Tempo da sessão atualizado.'); })}
             onRemove={(id) => run(async () => { setData(await repository.removeSession(id)); setStatus('Registro de tempo removido.'); })} />
           <button disabled={busy} onClick={() => void run(() => openLesson(lesson.rem))}>
@@ -477,7 +479,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
             setData(await repository.savePhase(id, null)); setStatus('Disciplina removida da fase.');
           })} />
       </details>}
-      {data && <SessionHistory sessions={data.sessions ?? {}} busy={busy}
+      {data && <SessionHistory auditBatches={data.auditBatches} sessions={data.sessions ?? {}} busy={busy}
         onSave={(id, changes) => run(async () => { setData(await repository.updateSession(id, changes)); setStatus('Tempo da sessão atualizado.'); })}
         onRemove={(id) => run(async () => { setData(await repository.removeSession(id)); setStatus('Registro de tempo removido.'); })} />}
       {data && <form className="rt-card" key={data.dailyMinutes + ':' + formRevision} onSubmit={(event) => {

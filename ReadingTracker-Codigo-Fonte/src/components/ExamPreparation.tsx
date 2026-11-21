@@ -127,8 +127,8 @@ export function ExamManager({plugin,data,busy,onSave}:{plugin:RNPlugin;data:Back
   </section>;
 }
 
-export function ExamDashboard({plugin,data,busy,onSelect,onOpen,onManage,onSave,reviewTag}:{plugin:RNPlugin;data:Backup;busy:boolean;
-  onSelect:(id:string)=>void;onOpen:(id:string)=>void;onManage:()=>void;onSave:(prep:Preparation)=>Promise<void>;reviewTag?:ReviewTagFilter}) {
+export function ExamDashboard({plugin,data,busy,onSelect,onOpen,onManage,onSave,reviewTag,onResultsSaved}:{plugin:RNPlugin;data:Backup;busy:boolean;
+  onSelect:(id:string)=>void;onOpen:(id:string)=>void;onManage:()=>void;onSave:(prep:Preparation)=>Promise<void>;reviewTag?:ReviewTagFilter;onResultsSaved:(data:Backup)=>void}) {
   const prep=data.preparation??emptyPreparation();
   const [titles,setTitles]=useState<Map<string,{title:string;subject:string;subjectId:string}>>();const [error,setError]=useState('');
   const [loadedIds,setLoadedIds]=useState<string>();
@@ -167,7 +167,7 @@ export function ExamDashboard({plugin,data,busy,onSelect,onOpen,onManage,onSave,
     <div className="rt-exam-grid"><div className="rt-row"><strong>Saldo de hoje</strong><p>{hours(plan.budget.remainingSeconds/60)}</p></div>
       <div className="rt-row"><strong>Revisão disponível</strong><p>{plan.budget.review} min</p></div><div className="rt-row"><strong>Avanço e questões</strong><p>{plan.budget.study} min · {Math.round(plan.used)} min distribuídos</p></div></div>
     {!!plan.warnings.length&&<details><summary>Avisos de cadastro ({plan.warnings.length})</summary><ul>{plan.warnings.map(w=><li key={w}>{w}</li>)}</ul></details>}
-    <FlashcardPlan data={{...data,dailyMinutes:prep.availability[today]??data.dailyMinutes}} titles={reviewTitles} busy={busy} onOpen={onOpen} paretoOnly={false} tag={reviewTag} priorities={examReviewPriorities(prep,today)}/>
+    <FlashcardPlan data={{...data,dailyMinutes:prep.availability[today]??data.dailyMinutes}} titles={reviewTitles} busy={busy} onOpen={onOpen} paretoOnly={false} tag={reviewTag} priorities={examReviewPriorities(prep,today)} onResultsSaved={onResultsSaved}/>
     <h3>O que estudar agora?</h3><p>Mínimos em risco de preparação vêm primeiro; depois, relevância por minuto, prioridade do concurso e proximidade da prova. Até 60 min por disciplina em cada plano.</p>
     <div className="rt-exam-grid">{plan.selected.map(row=>showActivity(row,true))}</div>
     {!plan.selected.length&&<p>Nenhuma atividade selecionada: confira o saldo, os vínculos e os avisos de cadastro.</p>}

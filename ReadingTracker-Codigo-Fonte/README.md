@@ -2,6 +2,8 @@
 
 Organize suas leituras, revisões e exercícios dentro do RemNote. Veja onde parou em cada aula, quanto falta para terminar e quais materiais pode estudar no tempo disponível.
 
+Na versão 0.1.19, escolha revisão por bloco, por disciplina ou por aula. Os blocos permitem selecionar matérias e quantidades; ao encerrar, confira o resumo de questões antes de confirmar qualquer registro nos exercícios.
+
 O progresso dos PDFs é informado por você. Você pode manter seus PDFs externos e usar as aulas que já organizou no RemNote.
 
 ## Instalar e abrir
@@ -160,3 +162,57 @@ Para revisar somente os flashcards de uma tag, abra Filtrar flashcards por tag, 
 ## Prática ampliada · versão 0.1.18
 Ao iniciar Revisar bloco, a área de resolução ocupa toda a largura do widget, com margens pequenas, e oculta temporariamente o dashboard. No documento, a altura é ampliada com base na área disponível do monitor, reservando espaço para os controles do aplicativo. Na barra lateral, a prática se adapta à altura disponível do painel. O botão Voltar ao plano fica no topo; ao sair, os blocos são atualizados. Os controles nativos de resolução continuam disponíveis. A ampliação fica limitada ao widget do plugin, sem manipular a janela do RemNote.
 
+
+## Revisões configuráveis e auditoria de questões · versão 0.1.19
+
+Em Retomar ou Revisões, escolha **Como deseja revisar?**:
+
+- **Revisão por bloco:** selecione as disciplinas em Selecionar disciplinas e editar quantidades. O padrão é 10 flashcards por disciplina. A distribuição alterna disciplinas e aulas; quando o tempo não comporta tudo, reduz a prévia sem favorecer uma única matéria.
+- **Revisão por disciplina:** escolha uma disciplina e abra Editar quantidade por aula. Cada aula começa com 10 flashcards; zero exclui a aula.
+- **Revisão por aula:** escolha a aula e a quantidade.
+- **Automática:** mantém os blocos anteriores por prioridade, normalmente entre 15 e 30 minutos.
+
+Os modos configuráveis montam um bloco com o que você escolheu, limitado ao saldo de revisão e aos cartões pendentes. Os filtros de fase, incidência e tag continuam valendo. As quantidades configuram **flashcards**, não questões únicas: uma questão pode gerar vários cartões. O resumo agrupa os cartões reconhecidos pelo mesmo número TEC. Se houver menos cartões pendentes que a quantidade pedida, o plugin mostra a quantidade real na prévia. As escolhas ficam no painel aberto; ao reabrir, volta ao padrão de 10.
+
+### Resolver e conferir
+
+1. Clique em Revisar bloco. O plugin prepara uma fotografia inicial dos históricos e a associação dos cartões às aulas originais antes de abrir a prática ampliada.
+2. Resolva normalmente. **Esqueci = erro. Difícil, Bom ou Fácil = acerto.** Operações de reagendamento ou redefinição não contam como respostas. O plugin não modifica o algoritmo nem envia avaliações extras.
+3. Clique em **Encerrar e auditar**. Uma saída nativa da fila também pode abrir o resumo após detectar respostas neste bloco. Se isso não ocorrer, use o botão do plugin.
+4. Confira os totais por aula e abra os detalhes das questões. Pode mudar o resultado, corrigir a aula, identificar manualmente uma questão ou excluir um item da gravação.
+5. Escolha **Confirmar e registrar selecionados**, ou use o resumo copiável e clique em **Descartar sem registrar** para fazer seus lançamentos manualmente. Nada é somado aos exercícios durante a prática ou apenas ao visualizar o resumo.
+
+O rascunho fica no armazenamento **local**, separado por base, e pode ser recuperado após fechar o painel. Na recuperação, todos os itens exigem conferência manual. O rascunho não sincroniza entre máquinas e não integra o backup JSON principal. Depois de confirmar, o registro mínimo da auditoria é sincronizado, incluído no backup e consultável em **Exercícios → Auditorias confirmadas**. O histórico mostra até 20 blocos na tela; o backup guarda todos os confirmados. Ajustar os totais acumulados pelo formulário de exercícios não reescreve a auditoria original.
+
+### Regras para proteger a estatística
+
+A identificação automática usa links HTTP/HTTPS do domínio tecconcursos.com.br com caminho /questoes/NUMERO, no cartão ou em seus ancestrais até a aula. Não pesquisa o site TEC nem exige credenciais. Links somente em irmãos, rótulos como #2417266 sem URL e ícones de livro não identificam automaticamente uma questão. Nesses casos, confira manualmente e informe tec:NUMERO ou use explicitamente o ID do cartão; este último não agrupa cópias em outros documentos.
+
+A primeira avaliação válida da questão no dia é a referência. Reapresentações após um erro não acrescentam novas questões nem transformam o erro inicial em acerto. Questões TEC já confirmadas naquele dia não são somadas de novo, mesmo em outro bloco. Se o cartão já tinha sido avaliado antes de iniciar o bloco naquele dia, o item exige conferência manual. Lançamentos manuais anteriores não têm identidade de questão; o plugin não consegue descobrir sozinho se eles já representam as mesmas questões. Nesse caso, exclua os itens do resumo ou descarte o bloco para evitar duplicidade.
+
+A captura usa APIs documentadas de eventos, cartões, histórico, ancestrais e URLs do SDK 0.0.46. O evento apenas solicita uma nova leitura; a contagem vem da comparação dos históricos. Ao encerrar, verifica leituras consecutivas, e volta a conferir antes de confirmar. Histórico ausente, mudança detectada ou possível desfazer, respostas conflitantes, identificação ambígua e falha de conferência final não entram automaticamente. Você pode conferir esses itens manualmente ou excluí-los. Cartões sem resposta também ficam fora da seleção automática.
+
+A gravação do resumo ocorre em uma operação, preservando páginas, etapas, tempo, editais e os exercícios anteriores. O ID do bloco e o registro por questão/dia protegem contra duplo clique e retry. O formato de backup passa a **versão 3**: lê formatos 1 e 2, preserva os dados e grava o novo formato ao salvar. Atualize todas as máquinas e o localhost; versões anteriores recusam o formato novo para evitar descartar as auditorias.
+
+### Limites e validação da primeira utilização
+
+Esta é uma **captura assistida com confirmação obrigatória**, não uma medição já certificada no seu RemNote. Eventos da fila são globais e a interface não fornece um identificador de sessão documentado para atribuir cada resposta à fila incorporada. Use uma única fila e uma única máquina por vez para auditar. Há proteção contra duas telas ativas no mesmo cliente; o SDK não fornece aqui uma transação distribuída para gravações simultâneas em máquinas diferentes.
+
+Antes de usar os totais na preparação, valide um bloco pequeno comparando manualmente os itens, especialmente múltipla escolha, cloze, reapresentações e desfazer. O histórico pode não estar disponível ou refletir imediatamente todas as operações; ausência de evidência não é tratada como acerto. Os testes automatizados usam históricos simulados e não substituem a validação da fila nativa. Descartar o resumo não desfaz as avaliações que você já enviou ao algoritmo do RemNote. O tempo de revisão continua sendo registrado manualmente; confirmar questões não desconta tempo automaticamente.
+
+Se a resposta da gravação falhar, o resumo pode ter sido salvo mesmo assim. A interface bloqueia novos lançamentos e o descarte até você usar Verificar se o bloco foi gravado. Se estiver confirmado, mostra o recibo e permite somente fechar a auditoria registrada. Isso evita lançar manualmente um resultado que já entrou nos exercícios. Não repita a inclusão enquanto houver dúvida sobre a confirmação.
+
+
+## Registrar o tempo ao sair da revisão · versão 0.1.20
+
+Ao encerrar a resolução pelo botão Encerrar e auditar, ou quando a fila emitir o evento nativo de saída, o plugin abre **Registrar revisão do bloco** com o tempo e os resultados. Se a saída nativa não emitir o evento na sua versão do RemNote, use o botão do plugin. A saída apenas solicita o registro: não salva nada automaticamente.
+
+O campo Tempo efetivo vem preenchido com o intervalo sugerido entre a abertura da prática e sua saída, excluindo a preparação inicial e a conferência do resumo. Corrija o valor se houve pausas. Em rascunhos interrompidos sem horário de fim conhecido, informe o tempo manualmente. Escolha a data e confirme as aulas realmente revisadas. A seleção inicial considera cartões com avaliação detectada, inclusive flashcards sem link TEC. Se o histórico não fornecer evidência suficiente, selecione as aulas manualmente.
+
+**Salvar revisão e questões selecionadas** grava, em uma única operação, o tempo e os acertos/erros conferidos. **Salvar somente o tempo** registra a revisão sem somar questões, permitindo lançá-las manualmente depois. **Descartar sem registrar** não grava tempo nem exercícios. Se já registrou o tempo deste bloco por outro caminho, desmarque Registrar tempo para não duplicá-lo. A opção Descontar do tempo disponível para revisão vem marcada.
+
+O tempo total do bloco é dividido entre as aulas selecionadas, por rateio estimado proporcional aos cartões avaliados detectados, preservando o total exato em segundos. Não é uma medição individual de tempo por aula; o histórico permite corrigir os valores. Uma mesma questão pode ser revisitada em outro bloco e consumir tempo real, mesmo que a regra de primeira tentativa diária impeça somar essa questão novamente aos exercícios.
+
+Em **Ajustes → Histórico de tempo**, ou no histórico da aula, os registros mostram aula, disciplina, duração de revisão, cartões avaliados detectados e os acertos/erros somados por aquele bloco. Em **Exercícios → Auditorias confirmadas**, também aparecem as aulas, seus resultados e o tempo atual no histórico. Editar ou remover tempo recalcula o saldo e preserva os exercícios. O lançamento usa a data indicada, sem dividir automaticamente o bloco entre datas caso atravesse meia-noite.
+
+O identificador do bloco protege tempo e questões contra duplo clique e retry. Se uma resposta de gravação ficar incerta, o fluxo de verificação também vale para o tempo. A recuperação de uma revisão já confirmada mostra o recibo e não cria novas sessões. O backup passa ao formato **4**, mantendo leitura dos formatos 1, 2 e 3; atualize todas as máquinas e o localhost para evitar usar versões anteriores que não reconhecem os novos registros.

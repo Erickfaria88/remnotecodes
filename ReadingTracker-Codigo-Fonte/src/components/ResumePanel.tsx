@@ -14,7 +14,7 @@ import { readingQueue, studyDay } from '../resume';
 import { filterStudySubjects, type PhaseSelection, type ReviewTagFilter } from '../study-scope';
 
 export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onReviews, busy, reviewOnly = false,
-  phaseSelection, paretoOnly, reviewTag, allowedLessonIds, reviewPriorities }: {
+  phaseSelection, paretoOnly, reviewTag, allowedLessonIds, reviewPriorities, onResultsSaved }: {
   plugin: RNPlugin; data: Backup; busy: boolean; onSelect: (id: string) => void; onOpen: (id: string) => void;
   onPublish: (tasks: DailyTask[], day: string) => Promise<boolean>;
   onReviews: () => void;
@@ -24,6 +24,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   reviewTag?: ReviewTagFilter;
   allowedLessonIds?: Set<string>;
   reviewPriorities?: Record<string,number>;
+  onResultsSaved:(data:Backup)=>void;
 }) {
   const [allTitles, setTitles] = useState<Map<string, { title: string; subject: string; subjectId: string }>>();
   const [failed, setFailed] = useState(false);
@@ -98,7 +99,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
 
   if (reviewOnly) return <section className="rt-card" aria-label="Blocos de revisão">
     {failed ? <p role="alert">Não foi possível consultar as aulas.</p> : !titles ? <p>Carregando aulas…</p> :
-      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} priorities={reviewPriorities} />}
+      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} priorities={reviewPriorities} onResultsSaved={onResultsSaved} />}
   </section>;
 
   return <section className="rt-card" aria-label="Retomar estudos">
@@ -126,7 +127,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
           {forecast.unknown > 0 && <p>{forecast.unknown} {forecast.unknown === 1 ? 'aula pendente fora da estimativa' : 'aulas pendentes fora da estimativa'} por falta de ritmo ou documento indisponível.</p>}
         </>}
       </section>
-      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} />
+      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} onResultsSaved={onResultsSaved} />
       <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} onSelect={onSelect}
         availableMinutes={studyMinutes} paretoOnly={paretoOnly} />
       {queue.due.length > 0 && <details><summary>Consultar retomadas de hoje e atrasadas · {queue.due.length}</summary>

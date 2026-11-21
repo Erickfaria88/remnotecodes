@@ -12,14 +12,17 @@ export function reviewBudget(dailyMinutes: number, share: number) {
   return { review, study: dailyMinutes - review };
 }
 
+export function orderReviewCandidates(candidates: ReviewCandidate[]) {
+  return [...candidates].sort((a, b) =>
+    Number(b.reviewDue) - Number(a.reviewDue) || Number(b.overdue) - Number(a.overdue) ||
+    (b.incidence ?? 0) / Math.max(1, b.cardIds.length) - (a.incidence ?? 0) / Math.max(1, a.cardIds.length) ||
+    (a.accuracy ?? 1) - (b.accuracy ?? 1) || a.cardIds.length - b.cardIds.length || a.id.localeCompare(b.id));
+}
 export function buildReviewBlocks(candidates: ReviewCandidate[], minutes: number, secondsPerCard: number) {
   const capacity = Math.floor(minutes * 60 / secondsPerCard);
   const maximum = Math.max(1, Math.floor(30 * 60 / secondsPerCard));
   const minimum = Math.max(1, Math.floor(15 * 60 / secondsPerCard));
-  const ordered = [...candidates].sort((a, b) =>
-    Number(b.reviewDue) - Number(a.reviewDue) || Number(b.overdue) - Number(a.overdue) ||
-    (b.incidence ?? 0) / Math.max(1, b.cardIds.length) - (a.incidence ?? 0) / Math.max(1, a.cardIds.length) ||
-    (a.accuracy ?? 1) - (b.accuracy ?? 1) || a.cardIds.length - b.cardIds.length || a.id.localeCompare(b.id));
+  const ordered=orderReviewCandidates(candidates);
   const blocks: { lessons: { id: string; cardIds: string[] }[]; cards: number; minutes: number }[] = [];
   const seen = new Set<string>();
   let remaining = capacity;

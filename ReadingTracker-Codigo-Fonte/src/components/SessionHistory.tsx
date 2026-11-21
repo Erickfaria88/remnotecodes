@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { formatDuration, parseDuration, sessionCategories, type StudySession } from '../study-sessions';
 import { studyDay } from '../resume';
+import type {AuditBatch} from '../question-audit';
 
 type Changes = Pick<StudySession, 'day' | 'category' | 'seconds' | 'counted' | 'note'>;
-export function SessionHistory({ sessions, lessonId, busy, onSave, onRemove }: {
+export function SessionHistory({ sessions, lessonId, busy, onSave, onRemove, auditBatches }: {
   sessions: Record<string, StudySession>; lessonId?: string; busy: boolean;
   onSave: (id: string, changes: Changes) => Promise<void>; onRemove: (id: string) => Promise<void>;
+  auditBatches?:Record<string,AuditBatch>;
 }) {
   const [editing, setEditing] = useState<string>();
   const [removing, setRemoving] = useState<string>();
@@ -21,6 +23,7 @@ export function SessionHistory({ sessions, lessonId, busy, onSave, onRemove }: {
       <span>{row.subject} · {row.day.split('-').reverse().join('/')}</span>
       <span>{sessionCategories.find((item) => item.id === row.category)?.label} · {formatDuration(row.seconds)}
         {row.counted ? ' · contabilizado no planejamento' : ' · fora do planejamento'}</span>
+      {row.auditId&&<span>Revisão em bloco · {row.reviewedCards??0} cartões avaliados detectados · {auditBatches?.[row.auditId]?.entries.filter(e=>e.lessonId===row.lessonId&&e.correct).length??0} acertos e {auditBatches?.[row.auditId]?.entries.filter(e=>e.lessonId===row.lessonId&&!e.correct).length??0} erros somados por este bloco</span>}
       {row.firstPage !== undefined && <span>Páginas {row.firstPage}–{row.lastPage}</span>}
       {row.note && <p>{row.note}</p>}
       {editing === row.id ? <form key={row.id + ':' + row.seconds + ':' + row.day + ':' + row.category} onSubmit={(event) => {

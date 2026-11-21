@@ -195,3 +195,11 @@ html.rt-reviewing .reading-tracker-panel.rt-review-practice {
   background: var(--canvas);
 }
 .rt-review-queue { width: 100%; min-width: 0; }
+.rt-audit-summary { display: grid; gap: 14px; padding: 12px 6px; }
+.rt-audit-summary > details > .rt-audit-row { margin-top: 10px; }
+.rt-audit-row > * + * { margin-top: 9px; }
+.rt-audit-notice { font-size: 12px; padding: 0 6px 6px; }
+.rt-review-selection { min-width: 0; border: 1px solid var(--line); border-radius: 9px; padding: 10px; margin: 10px 0; }
+.rt-review-selection > * + *, .rt-review-selection details > * + * { margin-top: 10px; }
+.rt-audit-items { min-width: 0; border: 0; margin: 0; padding: 0; }
+.rt-audit-items .rt-audit-row { margin-top: 10px; }

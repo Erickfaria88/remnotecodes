@@ -70,7 +70,7 @@ test('rejeita base diferente, esquema e registros inválidos sem gravação parc
   const baseline = await repo.saveLesson('aula-1', { totalPages: 10, readPages: 3 });
   for (const bad of [
     { ...baseline, baseId: 'base-b' },
-    { ...baseline, version: 3 },
+    { ...baseline, version: 5 },
     { ...baseline, lessons: { bad: { totalPages: 5, readPages: 10 } } },
     { ...baseline, globalPace: 0 },
     { ...baseline, subjectPaces: { materia: '30' } },
@@ -123,9 +123,9 @@ test('trata null retornado pelo SDK como chave ainda vazia, sem gravar nem aceit
 test('preserva dados existentes com versão desconhecida', async () => {
   const storage = storageDouble();
   const key = 'reading-tracker:v1:base-a';
-  await storage.setSynced(key, { version: 3, baseId: 'base-a' });
+  await storage.setSynced(key, { version: 5, baseId: 'base-a' });
   const repo = createRepository(storage, 'base-a');
   await assert.rejects(repo.load(), /versão incompatível/);
   await assert.rejects(repo.savePace(null, 30), /versão incompatível/);
-  assert.deepEqual(await storage.getSynced(key), { version: 3, baseId: 'base-a' });
+  assert.deepEqual(await storage.getSynced(key), { version: 5, baseId: 'base-a' });
 });
