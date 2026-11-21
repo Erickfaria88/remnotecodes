@@ -121,3 +121,9 @@ Abra a aula no formulário de estudo e informe a categoria, a data e a duração
 ## Seleção e navegação · versão 0.1.15
 Em Disciplinas, use Selecionar disciplina ou Trocar disciplina. A janela permite filtrar as disciplinas cadastradas por nome e fase e pesquisa outros documentos no RemNote após duas letras. A organização Disciplinas por fase fica em Ajustes, recolhida em Organizar disciplinas por fase. A fase da disciplina, o resumo de cobertura e a lista completa de progresso ficam recolhidos durante a edição. Ao selecionar uma aula, use os controles Anterior, Próxima ou o seletor de aula junto ao formulário. Salve os dados antes de mudar de aula.
 
+
+## Prioridades compartilhadas · versão 0.1.16
+Em Retomar e Revisões, comece por Prioridades de hoje. Selecione uma ou mais fases ou Todas as fases. A seleção filtra atenção, cobertura, revisões e avanço. O núcleo de 80% é calculado separadamente por disciplina. Leituras curtas selecionadas no plano recebem o destaque Melhor custo-benefício.
+
+Para revisar somente os flashcards de uma tag, abra Filtrar flashcards por tag, use Erro, Foco, 80/20 ou Base Teórica como atalho de busca e selecione a tag correta nos resultados. O filtro usa o ID da tag, sem exigir mudança de nome. A marcação direta é o padrão; marque Incluir tags herdadas dos tópicos-pai quando necessário. Os blocos usam apenas cartões pendentes das aulas selecionadas. O filtro de tag afeta os blocos de flashcards, não os lembretes manuais de revisão. As escolhas são mantidas entre as abas do painel aberto; recarregar ou abrir outro painel reinicia os filtros. O orçamento diário continua único, independentemente das fases selecionadas.
+

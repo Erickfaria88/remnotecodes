@@ -6,6 +6,8 @@ import { SessionHistory } from '../components/SessionHistory';
 import type { SessionInput } from '../study-sessions';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { SubjectPicker } from '../components/SubjectPicker';
+import { StudyFilters } from '../components/StudyFilters';
+import { filterStudySubjects, type PhaseSelection, type ReviewTagFilter } from '../study-scope';
 import { validPhase } from '../recommendations';
 import { PhasedSubjects } from '../components/PhasedSubjects';
 import { ReviewAgenda, ScheduleReview } from '../components/ReviewAgenda';
@@ -90,6 +92,11 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const repository = useMemo(() => createRepository(plugin.storage, baseId), [plugin, baseId]);
   const [data, setData] = useState<Backup>();
   const [view, setView] = useState<'resume' | 'subjects' | 'settings' | 'agenda' | 'exercises'>('resume');
+  const [phaseSelection, setPhaseSelection] = useState<PhaseSelection>('auto');
+  const [paretoOnly, setParetoOnly] = useState(false);
+  const [reviewTag, setReviewTag] = useState<ReviewTagFilter>();
+  const [scopeSubjects, setScopeSubjects] = useState<Map<string, string>>(new Map());
+  const [scopeError, setScopeError] = useState('');
   const [collapsed, setCollapsed] = useState(false);
   const [lessonPaneId, setLessonPaneId] = useState<string>();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -104,6 +111,19 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const [busy, setBusy] = useState(true);
   const action = useRef(false);
   const lessonEditor = useRef<HTMLElement>(null);
+  const scopeIds = JSON.stringify([...new Set([
+    ...Object.keys(data?.lessons ?? {}), ...Object.keys(data?.exercises ?? {}),
+    ...Object.values(data?.reviews ?? {}).map((row) => row.lessonId),
+  ])].sort());
+  useEffect(() => {
+    let current = true;
+    setScopeError('');
+    void plugin.rem.findMany(JSON.parse(scopeIds) as string[]).then((rems) => {
+      if (!rems) throw new Error('Aulas indisponíveis.');
+      if (current) setScopeSubjects(new Map(rems.flatMap((rem) => rem.parent ? [[rem._id, rem.parent] as const] : [])));
+    }).catch(() => { if (current) { setScopeSubjects(new Map()); setScopeError('Não foi possível filtrar a agenda por disciplina.'); } });
+    return () => { current = false; };
+  }, [plugin, scopeIds, formRevision]);
   const handledRequest = useRef<string>();
   const request = useTrackerPlugin((reactive) =>
     reactive.storage.getSession<LessonDashboardRequest>(lessonRequestKey(baseId)), [baseId]);
@@ -215,6 +235,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const record = lesson && data?.lessons[lesson.rem._id];
   const subjectPace = subjectId ? data?.subjectPaces[subjectId] : undefined;
   const pace = effectivePace(data?.globalPace ?? null, subjectPace);
+  const reviewScope = data ? filterStudySubjects(data, scopeSubjects, phaseSelection, paretoOnly) : new Map<string, string>();
+  const scopedReviews = Object.fromEntries(Object.entries(data?.reviews ?? {}).filter(([, row]) => reviewScope.has(row.lessonId)));
 
   async function saveLesson(progress: Progress | undefined, resumeOn: string | null, stars: number | null,
     steps: StudyStep[], exercises?: ExerciseResult, replaceExercises = false,
@@ -299,6 +321,9 @@ function BaseTracker({ baseId }: { baseId: string }) {
         <button type="button" aria-pressed={view === 'settings'} onClick={() => setView('settings')}>Ajustes</button>
       </nav>}
     </header>
+    {data && (view === 'resume' || view === 'agenda') && <StudyFilters plugin={plugin}
+      phases={data.subjectPhases} selection={phaseSelection} onPhases={setPhaseSelection}
+      paretoOnly={paretoOnly} onPareto={setParetoOnly} tag={reviewTag} onTag={setReviewTag} />}
     {collapsed && <div className="rt-dashboard-progress">
       <DocumentProgress location={WidgetLocation.DocumentBelowTitle} paneId={lessonPaneId} />
     </div>}
@@ -309,12 +334,14 @@ function BaseTracker({ baseId }: { baseId: string }) {
     </button>}
     {data && <div hidden={view !== 'resume'} className="rt-view">
       {view === 'resume' && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume} onPublish={publishResume}
-        onReviews={() => setView('agenda')} busy={busy} />}
+        onReviews={() => setView('agenda')} busy={busy} phaseSelection={phaseSelection} paretoOnly={paretoOnly} reviewTag={reviewTag} />}
     </div>}
     {data && <div hidden={view !== 'agenda'} className="rt-view">
       {view === 'agenda' && <ResumePanel plugin={plugin} data={data} onSelect={selectResume} onOpen={openResume}
-        onPublish={publishResume} onReviews={() => setView('agenda')} busy={busy} reviewOnly />}
-      <ReviewAgenda reviews={data.reviews} busy={busy} onOpen={openResume}
+        onPublish={publishResume} onReviews={() => setView('agenda')} busy={busy} reviewOnly
+        phaseSelection={phaseSelection} paretoOnly={paretoOnly} reviewTag={reviewTag} />}
+      {scopeError && <p role="alert">{scopeError}</p>}
+      <ReviewAgenda reviews={scopedReviews} busy={busy} onOpen={openResume}
         onAdd={() => { setView('subjects'); setStatus('Escolha a aula e abra Adicionar estudo à agenda.'); }}
         onDone={(id) => void run(async () => {
           setData(await repository.updateReview(id, { doneOn: studyDay() }));
