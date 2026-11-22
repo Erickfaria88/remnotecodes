@@ -247,3 +247,15 @@ Concluir o cronômetro não grava tempo automaticamente. Se a abertura do dashbo
 Há um cronômetro em andamento ou pendente por base nesta máquina. Ele usa armazenamento local e permanece ao trocar de documento ou fechar o painel. Enquanto estiver rodando, continua contando pelo relógio, inclusive se fechar o RemNote: pause antes de interromper os estudos. O tempo pode ser ajustado no formulário antes de salvar. Se atravessar meia-noite, a data sugerida é a da conclusão; ajuste se necessário, pois não há rateio automático entre dias. Durações acima de 24 horas precisam ser corrigidas no formulário. Descartar cronômetro remove somente o tempo ainda não registrado, preservando dados salvos.
 
 O cronômetro em andamento não sincroniza entre máquinas e não está no backup JSON; o estudo confirmado usa o armazenamento sincronizado e o histórico normal do plugin. O formato dos dados permanece 4. Não há alterações no conteúdo, nas tags, nos flashcards ou na hierarquia da aula.
+
+## Alternância e controles sem duplicação · versão 0.1.24
+
+A aula mantém uma única barra de progresso, etapas e cronômetro. O painel recolhido mostra apenas o botão Reading Tracker; os controles da aula permanecem acima dele.
+
+A seção Revisar antes de avançar pode ser recolhida pelo título. Essa preferência fica salva nesta máquina e base; recolher não remove a reserva dos blocos sugeridos.
+
+Em Ajustes, o limite diário por disciplina começa em 2 horas. Soma todos os tempos contabilizados no planejamento naquele dia, tanto revisão como avanço. As sugestões de revisão reservam seu tempo antes do plano de avanço. O planejamento normal e pós-edital respeitam esse limite. Quando há outras matérias elegíveis, o avanço evita a última disciplina registrada (ou as disciplinas do último bloco registrado). Pode sobrar tempo quando os filtros, a alternância ou o limite não permitem outras sugestões.
+
+Informe o tempo efetivo para que o limite considere o estudo realizado: páginas ou questões sem duração não permitem calcular esse consumo. Registros fora do planejamento não consomem o limite. É possível registrar o tempo real mesmo que ultrapasse o teto; o teto restringe sugestões, não o histórico.
+
+O backup passa ao formato 5 para guardar o limite por disciplina, com migração automática dos formatos anteriores e padrão de 120 minutos. Atualize as demais instalações antes de compartilhar a mesma base com esta versão.

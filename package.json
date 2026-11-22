@@ -1,6 +1,6 @@
 {
   "name": "reading-tracker",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,3 +22,4 @@
     "typescript": "~5.9.3"
   }
 }
+

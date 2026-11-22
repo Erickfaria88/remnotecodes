@@ -30,6 +30,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   const [failed, setFailed] = useState(false);
   const [today, setToday] = useState(studyDay);
   const [preview, setPreview] = useState<{ tasks: DailyTask[]; day: string }>();
+  const [reservedReview,setReservedReview]=useState<Record<string,number>>({});
 
   useEffect(() => {
     const update = () => setToday(studyDay());
@@ -127,9 +128,9 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
           {forecast.unknown > 0 && <p>{forecast.unknown} {forecast.unknown === 1 ? 'aula pendente fora da estimativa' : 'aulas pendentes fora da estimativa'} por falta de ritmo ou documento indisponível.</p>}
         </>}
       </section>
-      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} onResultsSaved={onResultsSaved} />
+      <FlashcardPlan data={data} titles={titles} busy={busy} onOpen={onOpen} paretoOnly={paretoOnly} tag={reviewTag} onResultsSaved={onResultsSaved} onPlanChange={setReservedReview} />
       <StudyRecommendations data={data} titles={titles} busy={busy} onOpen={onOpen} onSelect={onSelect}
-        availableMinutes={studyMinutes} paretoOnly={paretoOnly} />
+        availableMinutes={studyMinutes} paretoOnly={paretoOnly} reservedReviewSeconds={reservedReview}/>
       {queue.due.length > 0 && <details><summary>Consultar retomadas de hoje e atrasadas · {queue.due.length}</summary>
         <p>As retomadas concorrem por tempo no plano único de avanço.</p>
         {list(queue.due, true)}

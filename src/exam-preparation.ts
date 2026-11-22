@@ -2,6 +2,7 @@ import type { Backup } from './remnote/storage';
 import { validStudyDay, studyDay } from './resume';
 import { remainingDailyTime } from './study-sessions';
 import { studySteps } from './study-steps';
+import {subjectSecondsRemaining,subjectUsage} from './subject-budget';
 
 export interface ExamTopic {
   id: string; name: string; lessonIds: string[]; incidence: number | null;
@@ -164,6 +165,7 @@ export function projectExamPlan(data: Backup, prep: Preparation, subjectIds: Map
     if(dayIndex===horizon)break;
     let available=remainingDailyTime({...data,dailyMinutes:prep.availability[day]??data.dailyMinutes},day).study;
     const bySubject=new Map<string,number>();
+    const subjectRoom=subjectSecondsRemaining(data,subjectIds.values(),day);
     const live=tasks.filter(t=>exams.some(e=>e.date>day && e.subjects.some(s=>s.topics.some(topic=>topic.lessonIds.includes(t.row.lessonId!)))));
     live.sort((a,b)=>Number(b.row.protected)-Number(a.row.protected)||
       b.row.score*(1+30/Math.max(1,daysUntil(b.row.deadline,day)))-a.row.score*(1+30/Math.max(1,daysUntil(a.row.deadline,day)))||a.row.id.localeCompare(b.row.id));
@@ -173,7 +175,7 @@ export function projectExamPlan(data: Backup, prep: Preparation, subjectIds: Map
       progressed=false;
       for(const task of live) {
         const id=task.row.lessonId!;const subject=subjectIds.get(id)??id;
-        const cap=Math.min(available,60-(bySubject.get(subject)??0));
+        const cap=Math.min(available,60-(bySubject.get(subject)??0),Math.max(0,(subjectRoom[subject]??0)/60-(bySubject.get(subject)??0)));
         const isReading=task.reading>0.001;const remaining=isReading?task.reading:task.questions;
         const amount=Math.min(cap,isReading?30:20,remaining);
         if(amount<=0.001)continue;
@@ -206,7 +208,7 @@ export function futureCapacity(data: Backup, prep: Preparation, deadline: string
 
 export interface ExamActivity { id:string; lessonId?:string; title:string; minutes:number; kind:'reading'|'questions'|'gap';
   score:number; reasons:string[]; exams:string[]; deadline:string; protected:boolean; remaining:number|null; }
-export function buildExamPlan(data: Backup, prep: Preparation, subjectIds: Map<string,string>, today = studyDay()) {
+export function buildExamPlan(data: Backup, prep: Preparation, subjectIds: Map<string,string>, today = studyDay(),reservedReviewSeconds:Record<string,number>={}) {
   const exams = activeExams(prep,today);
   const candidates = new Map<string,ExamActivity>();
   const warnings:string[]=[];
@@ -273,11 +275,16 @@ export function buildExamPlan(data: Backup, prep: Preparation, subjectIds: Map<s
   const sorted=[...candidates.values()].sort((a,b)=>Number(b.protected)-Number(a.protected)||b.score-a.score||a.id.localeCompare(b.id));
   const selected:ExamActivity[]=[]; const excluded:ExamActivity[]=[]; let used=0;
   const bySubject=new Map<string,number>();
+  const subjectRoom=subjectSecondsRemaining(data,subjectIds.values(),today,reservedReviewSeconds);
+  const {recent}=subjectUsage(data,today);
+  const hasAlternative=sorted.some(row=>row.kind!=='gap'&&row.lessonId&&!recent.has(subjectIds.get(row.lessonId)??'')&&(subjectRoom[subjectIds.get(row.lessonId)??'']??0)>=60);
   for(const row of sorted) {
     const subject=row.lessonId?subjectIds.get(row.lessonId):undefined;
+    if(subject&&hasAlternative&&recent.has(subject)){excluded.push({...row,reasons:[...row.reasons,'Alternar após o último estudo registrado']});continue;}
     const minutes=Math.min(row.minutes,budget.study-used);
     if(row.kind==='gap' || minutes<=0 || subject && (bySubject.get(subject)??0)>=60) { excluded.push(row); continue; }
-    const allowed=Math.min(minutes,subject?60-(bySubject.get(subject)??0):minutes);
+    const allowed=Math.min(minutes,subject?60-(bySubject.get(subject)??0):minutes,subject?Math.max(0,Math.floor((subjectRoom[subject]??0)/60)-(bySubject.get(subject)??0)):minutes);
+    if(allowed<1){excluded.push({...row,reasons:[...row.reasons,'Limite diário por disciplina, incluindo a revisão']});continue;}
     selected.push({...row,minutes:allowed}); used+=allowed;
     if(subject) bySubject.set(subject,(bySubject.get(subject)??0)+allowed);
   }
