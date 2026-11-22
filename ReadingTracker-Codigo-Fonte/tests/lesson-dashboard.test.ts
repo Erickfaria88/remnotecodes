@@ -39,3 +39,11 @@ test('uma falha no registro do painel impede a navegação para um dashboard vaz
   await assert.rejects(openLessonDashboard(plugin, 'lesson'), /registro falhou/);
   assert.equal(opened, false);
 });
+test('cronômetro concluído acompanha a solicitação da aula antes de navegar',async()=>{
+  let published:{lessonId:string;timerId?:string}|undefined;let opened=false;
+  const plugin={kb:{async getCurrentKnowledgeBaseData(){return {_id:'base'};}},
+    rem:{async findByName(){return {_id:'dashboard',async isDocument(){return true;}};}},
+    app:{async registerWidget(){}},storage:{async setSession(_key:string,value:typeof published){published=value;}},
+    window:{async openRem(){assert.equal(published?.timerId,'timer1');opened=true;}}} as unknown as RNPlugin;
+  await openLessonDashboard(plugin,'lesson','timer1');assert.equal(published?.lessonId,'lesson');assert.equal(opened,true);
+});

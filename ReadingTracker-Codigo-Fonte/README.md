@@ -232,3 +232,18 @@ Um rascunho já finalizado cujo histórico continua inalterado mantém os result
 O botão **Voltar ao plano** fica sempre visível no topo da prática e do resumo, independentemente de pendências ou validação. Ele volta sem registrar exercícios ou tempo e mantém o rascunho local para recuperar depois. A saída não espera indefinidamente por uma chamada do SDK. Se houver uma gravação já em andamento, confira o rascunho/recibo antes de lançar manualmente os mesmos resultados.
 
 O resumo agora tem rolagem própria e mantém os controles de ação acessíveis. A seleção de respostas usa a mesma regra de validade na prévia e na gravação: itens incertos, com identificações inválidas ou ainda não conferidos ficam na seção recolhida, sem bloquear o salvamento das respostas válidas. Consultas que terminam depois de fechar a tela não devem reabrir nem regravar o rascunho abandonado. O formato dos dados permanece 4.
+
+## Iniciar estudo na aula · versão 0.1.23
+
+Depois de usar **Abrir aula** no Reading Tracker, o documento da aula mostra **Iniciar estudo** junto ao seu progresso. Aulas que já têm páginas, exercícios ou tempo cadastrado também oferecem esse controle. O botão aparece na aula aberta como documento, e não em cada linha de conteúdo.
+
+1. Escolha a atividade (Teoria, Literais, Questões, Revisão ou Passo Estratégico) e clique em **Iniciar estudo**.
+2. O cronômetro fica visível na aula. Use **Pausar** e **Retomar**; a pausa não entra na contagem. O dashboard também mostra o cronômetro ativo e permite voltar à aula.
+3. Clique em **Concluir e registrar**. O contador para e abre o dashboard com o formulário da aula correta e o tempo preenchido.
+4. Confira a duração e a categoria, informe páginas, acertos, erros e etapas e clique em **Salvar estudo**. O tempo e os demais dados são gravados juntos; Revisão desconta da reserva de revisão e as outras categorias descontam do avanço.
+
+Concluir o cronômetro não grava tempo automaticamente. Se a abertura do dashboard falhar, o tempo concluído continua pendente e pode ser reaberto pelo botão Registrar estudo cronometrado. Se sair do formulário sem salvar, o cronômetro concluído permanece para recuperar o registro. Um ID estável evita duplicar o mesmo tempo e exercícios em um retry. Depois de salvar, o cronômetro é limpo; se a limpeza local falhar, aparece como já registrado e não deve ser lançado de novo.
+
+Há um cronômetro em andamento ou pendente por base nesta máquina. Ele usa armazenamento local e permanece ao trocar de documento ou fechar o painel. Enquanto estiver rodando, continua contando pelo relógio, inclusive se fechar o RemNote: pause antes de interromper os estudos. O tempo pode ser ajustado no formulário antes de salvar. Se atravessar meia-noite, a data sugerida é a da conclusão; ajuste se necessário, pois não há rateio automático entre dias. Durações acima de 24 horas precisam ser corrigidas no formulário. Descartar cronômetro remove somente o tempo ainda não registrado, preservando dados salvos.
+
+O cronômetro em andamento não sincroniza entre máquinas e não está no backup JSON; o estudo confirmado usa o armazenamento sincronizado e o histórico normal do plugin. O formato dos dados permanece 4. Não há alterações no conteúdo, nas tags, nos flashcards ou na hierarquia da aula.

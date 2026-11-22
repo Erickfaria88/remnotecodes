@@ -4,6 +4,9 @@ import { documentMetrics } from '../document-metrics';
 import { useEffect, useState } from 'react';
 import { openLessonDashboard } from '../remnote/lesson-dashboard';
 import { studySteps } from '../study-steps';
+import {StudyTimerControl} from './StudyTimerControl';
+import {openedLessonKey,createTimerRepository} from '../study-timer';
+import {documentTitle} from '../remnote/documents';
 
 
 const percent = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
@@ -36,7 +39,12 @@ export function DocumentProgress({ location, paneId }: {
       if (!base?._id || !id) return null;
       const data = await createRepository(reactive.storage, base._id).load();
       const document = await reactive.rem.findOne(id);
+      const opened=await reactive.storage.getSession<boolean>(openedLessonKey(base._id,id));
+      const activeTimer=await createTimerRepository(reactive.storage,base._id).load().catch(()=>undefined);
+      const ownLesson=!!(data.lessons[id]||data.exercises[id]||opened||activeTimer?.lessonId===id||Object.values(data.sessions??{}).some(s=>s.lessonId===id));
       return { ...documentMetrics(data, id, document?.children ?? []), id,
+        baseId:base._id,title:document?await documentTitle(reactive,document):'',
+        timerEligible:ownLesson&&!!document?.parent&&!!document&&await document.isDocument(),
         isLesson: !(document?.children ?? []).some((child) => data.lessons[child] || data.exercises[child]) };
     } catch (error) {
       console.error('Reading Tracker: progresso do documento', error);
@@ -44,7 +52,7 @@ export function DocumentProgress({ location, paneId }: {
     }
   }, [plugin, location, paneId]);
 
-  if (!metrics || (metrics.percent === null && !metrics.exercise)) return null;
+  if (!metrics || (metrics.percent === null && !metrics.exercise&&!metrics.timerEligible)) return null;
   async function openDashboard() {
     setOpening(true);
     setOpenError('');
@@ -84,6 +92,7 @@ export function DocumentProgress({ location, paneId }: {
         background: '#fff', color: '#2651ba', cursor: 'pointer' }}>
       {opening ? 'Abrindo…' : 'Registrar estudo desta aula ↗'}
     </button>}
+    {metrics.isLesson&&metrics.timerEligible&&location===WidgetLocation.DocumentBelowTitle&&<StudyTimerControl key={metrics.baseId+':'+metrics.id} baseId={metrics.baseId} lessonId={metrics.id} title={metrics.title}/>}
     {openError && <p role="alert">{openError}</p>}
   </section>;
 }

@@ -7,10 +7,10 @@ export async function attachDashboard(plugin: RNPlugin, noteId: string) {
   });
 }
 
-export interface LessonDashboardRequest { lessonId: string; token: string }
+export interface LessonDashboardRequest { lessonId: string; token: string; timerId?:string }
 export const lessonRequestKey = (baseId: string) => 'reading-tracker:open-lesson:' + baseId;
 
-export async function openLessonDashboard(plugin: RNPlugin, lessonId: string) {
+export async function openLessonDashboard(plugin: RNPlugin, lessonId: string, timerId?:string) {
   const base = await plugin.kb.getCurrentKnowledgeBaseData();
   const note = await plugin.rem.findByName(['Dashboard de Estudos'], null);
   if (!note || !await note.isDocument()) {
@@ -18,7 +18,7 @@ export async function openLessonDashboard(plugin: RNPlugin, lessonId: string) {
   }
   await attachDashboard(plugin, note._id);
   await plugin.storage.setSession(lessonRequestKey(base._id), {
-    lessonId, token: crypto.randomUUID(),
+    lessonId, token: crypto.randomUUID(), ...(timerId?{timerId}:{}),
   } satisfies LessonDashboardRequest);
   await plugin.window.openRem(note);
 }
