@@ -5,7 +5,7 @@ import { calendarReminder, googleCalendarUrl, studyDay, validStudyDay, type Read
 
 import { studySteps, type StudyStep } from '../study-steps';
 import { incidenceStars, validIncidence } from '../pareto';
-import { parseDuration, sessionCategories, type SessionInput } from '../study-sessions';
+import { parseDuration, formatDuration, sessionCategories, type SessionInput } from '../study-sessions';
 
 interface Props {
   title: string;
@@ -14,12 +14,13 @@ interface Props {
   busy: boolean;
   calendarId: string;
   lessonId: string;
+  initialSession?:SessionInput;
   onSave: (progress: Progress | undefined, resumeOn: string | null, stars: number | null,
     steps: StudyStep[], exercises?: ExerciseResult, replaceExercises?: boolean,
     incidence?: number | null, incidenceTopic?: string, session?: SessionInput) => Promise<void>;
 }
 
-export function LessonForm({ title, progress, exercises, busy, calendarId, lessonId, onSave }: Props) {
+export function LessonForm({ title, progress, exercises, busy, calendarId, lessonId, onSave, initialSession }: Props) {
   const [total, setTotal] = useState(progress?.totalPages.toString() ?? '');
   const [read, setRead] = useState(progress?.readPages.toString() ?? '0');
   const [correct, setCorrect] = useState('');
@@ -27,12 +28,12 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
   const [correctingExercises, setCorrectingExercises] = useState(false);
   const [incidence, setIncidence] = useState(progress?.incidence?.toString() ?? '');
   const [incidenceTopic, setIncidenceTopic] = useState(progress?.incidenceTopic ?? '');
-  const [sessionId] = useState(() => crypto.randomUUID());
-  const [duration, setDuration] = useState('');
-  const [sessionDay, setSessionDay] = useState(studyDay);
-  const [category, setCategory] = useState<SessionInput['category']>('theory');
-  const [counted, setCounted] = useState(true);
-  const [note, setNote] = useState('');
+  const [sessionId] = useState(() => initialSession?.id??crypto.randomUUID());
+  const [duration, setDuration] = useState(initialSession?formatDuration(initialSession.seconds):'');
+  const [sessionDay, setSessionDay] = useState(initialSession?.day??studyDay());
+  const [category, setCategory] = useState<SessionInput['category']>(initialSession?.category??'theory');
+  const [counted, setCounted] = useState(initialSession?.counted??true);
+  const [note, setNote] = useState(initialSession?.note??'');
   const [firstPage, setFirstPage] = useState('');
   const [lastPage, setLastPage] = useState('');
   const [error, setError] = useState('');
@@ -134,6 +135,7 @@ export function LessonForm({ title, progress, exercises, busy, calendarId, lesso
 
   return <form onSubmit={submit}>
     <h3>{title}</h3>
+    {initialSession&&<p role="status">Tempo do cronômetro carregado: {formatDuration(initialSession.seconds)}. Confira a duração e registre páginas, questões e demais informações antes de Salvar estudo.</p>}
     <fieldset className="rt-exercise-fields" disabled={busy}>
       <legend>Registro de tempo</legend>
       <div className="fields">

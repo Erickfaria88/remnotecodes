@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { SubjectPicker } from '../components/SubjectPicker';
 import { StudyFilters } from '../components/StudyFilters';
 import { AuditHistory } from '../components/AuditHistory';
+import {StudyTimerControl} from '../components/StudyTimerControl';
+import {createTimerRepository,openedLessonKey,timerSession} from '../study-timer';
 import { ExamDashboard, ExamManager } from '../components/ExamPreparation';
 import { emptyPreparation, examLessonIds, examReviewPriorities, type Preparation } from '../exam-preparation';
 import { filterStudySubjects, type PhaseSelection, type ReviewTagFilter } from '../study-scope';
@@ -109,6 +111,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const [imported, setImported] = useState<Backup>();
   const [exported, setExported] = useState('');
   const [formRevision, setFormRevision] = useState(0);
+  const [timerSeed,setTimerSeed]=useState<{lessonId:string;session:SessionInput}>();
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
@@ -139,6 +142,14 @@ function BaseTracker({ baseId }: { baseId: string }) {
     setView('exercises');
     void run(async () => {
       await loadSelectedLesson(request.lessonId);
+      if(request.timerId){
+        const timer=await createTimerRepository(plugin.storage,baseId).load();
+        if(!timer||timer.id!==request.timerId||timer.lessonId!==request.lessonId)throw new Error('O estudo cronometrado mudou. Reabra o registro pela aula.');
+        const latestData=await repository.load();
+        if(latestData.sessions?.[timer.id]){
+          setData(latestData);setFormRevision(r=>r+1);setStatus('Este tempo já foi registrado. Não repita o lançamento.');
+        }else{setTimerSeed({lessonId:request.lessonId,session:timerSession(timer)});setFormRevision(r=>r+1);}
+      }
       const latest = await plugin.storage.getSession<LessonDashboardRequest>(lessonRequestKey(baseId));
       if (latest?.token === request.token) await plugin.storage.setSession(lessonRequestKey(baseId), null);
     });
@@ -205,6 +216,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
   }
 
   async function loadSelectedLesson(id: string) {
+      setTimerSeed(undefined);
       const rem = await plugin.rem.findOne(id);
       const parent = rem && await rem.getParentRem();
       if (!parent || !(await parent.isDocument())) throw new Error('Disciplina indisponível.');
@@ -217,6 +229,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
 
   async function openLesson(rem: Lesson['rem']) {
     const paneId = isDashboard ? await plugin.window.getFocusedPaneId().catch(() => undefined) : undefined;
+    await plugin.storage.setSession(openedLessonKey(baseId,rem._id),true);
     await plugin.window.openRem(rem);
     if (isDashboard) {
       setLessonPaneId(paneId);
@@ -267,8 +280,13 @@ function BaseTracker({ baseId }: { baseId: string }) {
       setData(await repository.saveStudy(lesson.rem._id, progress, resumeOn, stars, steps, exercises, replaceExercises,
         incidence, incidenceTopic, session ? { ...session, lessonId: lesson.rem._id, subjectId,
           title: lesson.title, subject: subject!.title } : undefined));
+      let timerWarning='';
+      if(session&&timerSeed?.session.id===session.id){
+        setTimerSeed(undefined);
+        try{await createTimerRepository(plugin.storage,baseId).clear(session.id);}catch{timerWarning=' O cronômetro local ainda precisa ser limpo; este tempo já está registrado.';}
+      }
       setFormRevision((revision) => revision + 1);
-      setStatus('Estudo salvo.');
+      setStatus('Estudo salvo.'+timerWarning);
     });
   }
 
@@ -339,6 +357,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
         <button type="button" aria-pressed={view === 'settings'} onClick={() => setView('settings')}>Ajustes</button>
       </nav>}
     </header>
+    {data&&<StudyTimerControl baseId={baseId}/>}
     {data && !collapsed && <section className="rt-card rt-preparation-mode" aria-label="Modo de preparação">
       <label>Preparação<select disabled={busy} value={preparation.mode}
         onChange={(event) => void savePreparation({ ...preparation, mode: event.target.value as Preparation['mode'] }).catch(() => undefined)}>
@@ -455,7 +474,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
           </nav>
           <LessonForm title={lesson.title}
             progress={record} exercises={data.exercises[lesson.rem._id]} busy={busy}
-            calendarId={baseId + ":" + lesson.rem._id} lessonId={lesson.rem._id} onSave={saveLesson} />
+            calendarId={baseId + ":" + lesson.rem._id} lessonId={lesson.rem._id} onSave={saveLesson}
+            initialSession={timerSeed?.lessonId===lesson.rem._id?timerSeed.session:undefined}/>
           <ScheduleReview lessonId={lesson.rem._id}
             title={lesson.title} subject={subject.title} busy={busy}
             onSave={(row) => void run(async () => {
