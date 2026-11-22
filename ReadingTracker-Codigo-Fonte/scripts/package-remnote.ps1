@@ -35,6 +35,11 @@ try {
   Copy-Item -LiteralPath 'README.md' -Destination $staging
 
   $manifest = Get-Content -LiteralPath 'public/manifest.json' -Raw | ConvertFrom-Json -AsHashtable
+  $packageVersion = (Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json).version
+  $manifestVersion = "$($manifest.version.major).$($manifest.version.minor).$($manifest.version.patch)"
+  if ($packageVersion -ne $manifestVersion) {
+    throw "Versões divergentes: package.json=$packageVersion; manifest.json=$manifestVersion."
+  }
   $manifest.repoUrl = $RepositoryUrl.AbsoluteUri.TrimEnd('/')
   $manifest.unlisted = $true
   $manifestPath = Join-Path $staging 'manifest.json'
@@ -51,3 +56,4 @@ try {
     if ($resolved -eq $staging) { Remove-Item -LiteralPath $resolved -Recurse -Force }
   }
 }
+
