@@ -1,11 +1,14 @@
+import {subjectSecondsRemaining} from './subject-budget';
 import type { Backup } from './remnote/storage';
 import { exerciseAccuracy } from './exercise-results';
 
-export function attentionLessons(data: Backup, subjects: Map<string, string>, minimumQuestions: number) {
+export function attentionLessons(data: Backup, subjects: Map<string, string>, minimumQuestions: number, daily?: {day:string; reservedReviewSeconds?:Record<string,number>}) {
+  const room=daily?subjectSecondsRemaining(data,subjects.values(),daily.day,daily.reservedReviewSeconds):undefined;
   return [...subjects.keys()].flatMap((id) => {
     const result = data.exercises[id];
     const total = result ? result.correct + result.incorrect : 0;
     const subject = subjects.get(id);
+    if (subject && room && room[subject] < 60) return [];
     const ratio = result ? result.correct / total : null;
     if (!subject || total >= minimumQuestions && ratio !== null && ratio >= 0.8) return [];
     const reason = total === 0 ? 'Sem exercícios cadastrados' :
@@ -19,3 +22,4 @@ export function attentionLessons(data: Backup, subjects: Map<string, string>, mi
   }).sort((a, b) => (a.phase ?? Infinity) - (b.phase ?? Infinity) || b.stars - a.stars ||
     (a.ratio ?? 0.8) - (b.ratio ?? 0.8) || a.total - b.total || a.id.localeCompare(b.id));
 }
+

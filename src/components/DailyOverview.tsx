@@ -5,13 +5,14 @@ import { formatDuration, remainingDailyTime } from '../study-sessions';
 
 type LessonName = { title: string; subject: string; subjectId: string };
 
-export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onReviews }: {
+export function DailyOverview({ data, titles, today, busy, reservedReviewSeconds={}, onSelect, onOpen, onReviews }: {
+  reservedReviewSeconds?:Record<string,number>;
   data: Backup; titles: Map<string, LessonName>; today: string; busy: boolean;
   onSelect: (id: string) => void; onOpen: (id: string) => void; onReviews: () => void;
 }) {
   const [minimum, setMinimum] = useState('10');
   const subjects = new Map([...titles].map(([id, row]) => [id, row.subjectId]));
-  const rows = attentionLessons(data, subjects, Number(minimum));
+  const rows = attentionLessons(data, subjects, Number(minimum),{day:today,reservedReviewSeconds});
   const reviews = Object.values(data.reviews).filter((row) => !row.doneOn && row.dueOn <= today);
   const overdue = reviews.filter((row) => row.dueOn < today).length;
   const time = remainingDailyTime(data, today);
@@ -42,8 +43,8 @@ export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onR
         </select>
       </label>
       <p>Sem exercícios, com poucas questões ou abaixo de 80% de acerto. Ordem por fase, importância e desempenho.
-        Estas são oportunidades para o plano de avanço abaixo.</p>
-      {rows.length === 0 ? <p>Nenhuma aula atende a esse filtro.</p> : <details><summary>Consultar aulas que precisam de atenção · {rows.length}</summary><ul>{rows.map((row) => {
+        Estas são oportunidades para o plano de avanço abaixo. A lista respeita o limite diário por disciplina, descontando os registros de hoje e a revisão sugerida.</p>
+      {rows.length === 0 ? <p>Nenhuma aula atende a esse filtro com saldo disponível no limite diário por disciplina.</p> : <details><summary>Consultar aulas que precisam de atenção · {rows.length}</summary><ul>{rows.map((row) => {
         const name = titles.get(row.id)!;
         return <li key={row.id} className={'rt-row rt-attention-' + row.band}>
           <button className="rt-row-main" type="button" disabled={busy} onClick={() => onSelect(row.id)}>
@@ -63,3 +64,4 @@ export function DailyOverview({ data, titles, today, busy, onSelect, onOpen, onR
     </section>
   </>;
 }
+

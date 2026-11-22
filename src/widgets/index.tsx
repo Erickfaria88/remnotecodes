@@ -1,9 +1,11 @@
+import {showDailyPlan} from '../remnote/daily-plan';
 import { registerDashboardNote } from '../remnote/dashboard-note';
 import { declareIndexPlugin, WidgetLocation, type ReactRNPlugin } from '@remnote/plugin-sdk';
 
 const widgetName = 'reading-tracker';
 
 async function onActivate(plugin: ReactRNPlugin) {
+  await plugin.app.registerWidget('today-plan',WidgetLocation.Popup,{dimensions:{width:940,height:720}});
   await plugin.app.registerWidget(widgetName, WidgetLocation.RightSidebar, {
     dimensions: { height: 600, width: 370 },
   });
@@ -27,11 +29,15 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  await plugin.app.registerCommand({id:'open-daily-plan',name:'Abrir Plano de hoje',description:'Resumo das revisões e aulas sugeridas para hoje.',action:async()=>{try{await showDailyPlan(plugin);}catch(e){await plugin.app.toast('Não foi possível abrir o Plano de hoje.');}}});
   try {
     await registerDashboardNote(plugin);
   } catch (error) {
     console.error('Dashboard de Estudos: falha no registro', error);
   }
+  void showDailyPlan(plugin,true).catch(error=>console.error('Plano de hoje:',error));
 }
 
 declareIndexPlugin(onActivate, async () => {});
+
+

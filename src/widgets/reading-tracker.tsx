@@ -1,3 +1,5 @@
+import {DailyPlanSettings} from '../components/DailyPlanSettings';
+import {dailyKeys} from '../remnote/daily-plan';
 import { renderWidget, usePlugin, useTrackerPlugin, type RNPlugin } from '@remnote/plugin-sdk';
 import { lessonRequestKey, type LessonDashboardRequest } from '../remnote/lesson-dashboard';
 
@@ -100,6 +102,11 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const [phaseSelection, setPhaseSelection] = useState<PhaseSelection>('auto');
   const [paretoOnly, setParetoOnly] = useState(false);
   const [reviewTag, setReviewTag] = useState<ReviewTagFilter>();
+  const [scopeLoaded,setScopeLoaded]=useState(false);
+  useEffect(()=>{let live=true;void plugin.storage.getLocal<{phase:PhaseSelection;pareto:boolean;tag?:ReviewTagFilter}>(dailyKeys(baseId).scope).then(s=>{if(live&&s){setPhaseSelection(s.phase);setParetoOnly(s.pareto);setReviewTag(s.tag);}}).catch(()=>undefined).finally(()=>{if(live)setScopeLoaded(true);});return()=>{live=false;};},[plugin,baseId]);
+  useEffect(()=>{if(scopeLoaded)void plugin.storage.setLocal(dailyKeys(baseId).scope,{phase:phaseSelection,pareto:paretoOnly,tag:reviewTag}).catch(()=>undefined);},[plugin,baseId,scopeLoaded,phaseSelection,paretoOnly,reviewTag]);
+
+
   const [scopeSubjects, setScopeSubjects] = useState<Map<string, string>>(new Map());
   const [scopeError, setScopeError] = useState('');
   const [collapsed, setCollapsed] = useState(false);
@@ -130,6 +137,9 @@ function BaseTracker({ baseId }: { baseId: string }) {
     }).catch(() => { if (current) { setScopeSubjects(new Map()); setScopeError('Não foi possível filtrar a agenda por disciplina.'); } });
     return () => { current = false; };
   }, [plugin, scopeIds, formRevision]);
+  const dailyNav=useTrackerPlugin(p=>p.storage.getSession<{view:'resume'|'agenda';token:string}>(dailyKeys(baseId).nav),[baseId]);
+  const handledNav=useRef<string>();
+  useEffect(()=>{if(isDashboard&&dailyNav&&handledNav.current!==dailyNav.token){handledNav.current=dailyNav.token;setCollapsed(false);setView(dailyNav.view);}},[dailyNav]);
   const handledRequest = useRef<string>();
   const request = useTrackerPlugin((reactive) =>
     reactive.storage.getSession<LessonDashboardRequest>(lessonRequestKey(baseId)), [baseId]);
@@ -489,6 +499,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
           </button>
     </section>}
     <div hidden={!!data && view !== 'settings'} className="rt-view">
+      <DailyPlanSettings baseId={baseId}/>
       {data && <details><summary>Organizar disciplinas por fase</summary>
         <PhasedSubjects plugin={plugin} phases={data.subjectPhases} records={data.lessons} refresh={formRevision} busy={busy}
           onSelect={(next) => { setView('subjects'); selectSubject(next); }}
@@ -571,5 +582,8 @@ function BaseTracker({ baseId }: { baseId: string }) {
 }
 
 renderWidget(ReadingTracker);
+
+
+
 
 

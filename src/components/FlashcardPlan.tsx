@@ -12,7 +12,8 @@ import { balancedReview, type ReviewSelection as Selection } from '../balanced-r
 import { ReviewSelection } from './ReviewSelection';
 import {subjectSecondsRemaining,plannedReviewSeconds} from '../subject-budget';
 
-export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag, priorities, onResultsSaved,onPlanChange }: {
+export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag, priorities, onResultsSaved,onPlanChange,compact=false }: {
+  compact?:boolean;
   data: Backup;
   titles: Map<string, { title: string; subject: string; subjectId: string }>;
   onOpen: (id: string) => void;
@@ -38,6 +39,7 @@ export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag, pri
   const [expanded,setExpanded]=useState(true);
   const expansionReady=useRef(false);
   useEffect(()=>{
+    if(compact)return;
     let live=true;expansionReady.current=false;
     void plugin.storage.getLocal<boolean>('reading-tracker:review-expanded:'+data.baseId).then(value=>{if(live&&typeof value==='boolean')setExpanded(value);})
       .catch(()=>undefined).finally(()=>{if(live)expansionReady.current=true;});
@@ -88,7 +90,7 @@ export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag, pri
   }, [data, grouped, budget.review, seconds, ready, priorities, selection, titles, ids,day]);
   const total = blocks.reduce((sum, block) => sum + block.cards, 0);
   const plannedKey=JSON.stringify(plannedReviewSeconds(blocks,subjects,seconds));
-  useEffect(()=>{onPlanChange?.(JSON.parse(plannedKey));},[onPlanChange,plannedKey]);
+  useEffect(()=>{if(ready)onPlanChange?.(JSON.parse(plannedKey));},[onPlanChange,plannedKey,ready]);
 
   async function start(cardIds: string[]) {
     try {
@@ -98,7 +100,7 @@ export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag, pri
   }
   return <details className="rt-review-plan" aria-label="Plano de revisão com flashcards" open={expanded} onToggle={e=>{
     const open=e.currentTarget.open;setExpanded(open);
-    if(expansionReady.current)void plugin.storage.setLocal('reading-tracker:review-expanded:'+data.baseId,open).catch(()=>undefined);
+    if(!compact&&expansionReady.current)void plugin.storage.setLocal('reading-tracker:review-expanded:'+data.baseId,open).catch(()=>undefined);
   }}>
     <summary><strong>Revisar antes de avançar</strong><span className="rt-review-summary"> · {total} flashcards · ~{Math.ceil(total*seconds/60)} min{pendingAudit?' · registro pendente':''}</span></summary>
     {draftError&&<p role="alert">{draftError}</p>}
@@ -108,27 +110,32 @@ export function FlashcardPlan({ data, titles, onOpen, busy, paretoOnly, tag, pri
       (tag.includeInherited ? ' · inclui herança' : ' · marcação direta') : 'Todas as tags'}</p>
     <p>Até {budget.review} min · {seconds} s por flashcard · {total} cartões nos blocos sugeridos</p>
     <p>Limite diário por disciplina: {data.subjectDailyMinutes??120} min, somando revisão e avanço registrados.</p>
-    <ReviewSelection value={selection} onChange={setSelection} titles={new Map([...titles].filter(([id])=>ids.split(',').includes(id)))}
-      available={new Map([...(ready?grouped??new Map():new Map())].map(([id,row])=>[id,row.cardIds.length]))} busy={busy||loading||!!active}/>
+    {!compact&&<ReviewSelection value={selection} onChange={setSelection} titles={new Map([...titles].filter(([id])=>ids.split(',').includes(id)))}
+      available={new Map([...(ready?grouped??new Map():new Map())].map(([id,row])=>[id,row.cardIds.length]))} busy={busy||loading||!!active}/>}
     <button type="button" disabled={busy || loading || !!active} onClick={() => setRevision((value) => value + 1)}>
       {loading ? 'Consultando flashcards…' : 'Atualizar blocos'}
     </button>
     {error && <p role="alert">{error}</p>}
     {!loading && grouped && blocks.length === 0 && <p>Nenhum flashcard disponível para os filtros, saldo e limite diário por disciplina.</p>}
-    <p>Estimativa pelos cartões com data até hoje, incluindo atrasados. Cartões novos sem data ficam fora da contagem.
-      A prática pode reapresentar cartões e alterar a duração.</p>
+    {compact&&blocks.length>2&&<p>Mostrando os dois primeiros blocos. Os demais ficam no dashboard.</p>}
+    {!compact&&<p>Estimativa pelos cartões com data até hoje, incluindo atrasados. Cartões novos sem data ficam fora da contagem.
+      A prática pode reapresentar cartões e alterar a duração.</p>}
     {active && (ready || recover) ? <ReviewPractice key={recover?.id??active.join(',')} cards={active} baseId={data.baseId}
       owners={new Map([...(grouped??new Map())].flatMap(([id,row])=>row.cardIds.map((cardId:string)=>[cardId,id] as const)))}
       titles={titles} onSaved={onResultsSaved} recovered={recover}
-      onExit={() => { setActive(undefined); setRecover(undefined); setRevision((value) => value + 1); }} /> : <ul>{blocks.map((block, index) => <li className="rt-row" key={index}>
+      onExit={() => { setActive(undefined); setRecover(undefined); setRevision((value) => value + 1); }} /> : <ul>{(compact?blocks.slice(0,2):blocks).map((block, index) => <li className="rt-row" key={index}>
       <strong>Bloco de ~{Math.ceil(block.minutes)} min · {block.cards} flashcards</strong>
-      {block.lessons.map((lesson) => <div key={lesson.id}>
+      {(compact?block.lessons.slice(0,3):block.lessons).map((lesson) => <div key={lesson.id}>
         <p>{titles.get(lesson.id)?.subject} · {titles.get(lesson.id)?.title}</p>
         <small>{lesson.cardIds.length} cartões neste bloco</small>
         <button type="button" disabled={busy} onClick={() => onOpen(lesson.id)}>Abrir aula</button>
       </div>)}
+      {compact&&block.lessons.length>3&&<p>Mais {block.lessons.length-3} aulas neste bloco.</p>}
       <button className="rt-primary" type="button" disabled={busy || loading || !draftChecked || !!pendingAudit}
         onClick={() => void start(block.lessons.flatMap((lesson) => lesson.cardIds))}>Revisar bloco</button>
     </li>)}</ul>}
   </details>;
 }
+
+
+
