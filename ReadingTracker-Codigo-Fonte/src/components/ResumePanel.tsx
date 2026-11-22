@@ -107,7 +107,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     <h2>Retomar estudos</h2>
     {failed ? <p role="alert">Não foi possível consultar as aulas de retomada.</p> : !titles ? <p>Carregando…</p> : <>
       <DailyOverview data={{ ...data, reviews: scopedReviews }} titles={titles} today={today} busy={busy}
-        onSelect={onSelect} onOpen={onOpen} onReviews={onReviews} />
+        onSelect={onSelect} onOpen={onOpen} onReviews={onReviews} reservedReviewSeconds={reservedReview} />
       <details><summary>Cobertura dos assuntos mais cobrados por disciplina</summary>
         {[...new Set([...titles.values()].map((row) => row.subjectId))].map((subjectId) => {
           const items = [...titles].filter(([, row]) => row.subjectId === subjectId);
@@ -161,3 +161,4 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     </>}
   </section>;
 }
+

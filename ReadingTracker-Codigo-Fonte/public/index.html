@@ -4,7 +4,7 @@
 <body>
 <script type="module">
   const widgetName = new URLSearchParams(location.search).get('widgetName');
-  const widgets = { index: './index-sandbox.js', 'reading-tracker': './reading-tracker-sandbox.js', 'reading-dashboard': './reading-dashboard-sandbox.js', 'document-progress': './document-progress-sandbox.js', 'lesson-progress': './lesson-progress-sandbox.js' };
+  const widgets = { 'today-plan': './today-plan-sandbox.js', index: './index-sandbox.js', 'reading-tracker': './reading-tracker-sandbox.js', 'reading-dashboard': './reading-dashboard-sandbox.js', 'document-progress': './document-progress-sandbox.js', 'lesson-progress': './lesson-progress-sandbox.js' };
   if (widgetName === 'index' || widgetName === 'document-progress' || widgetName === 'lesson-progress') {
     import(widgets[widgetName]).catch(console.error);
   } else {
@@ -16,7 +16,7 @@
       status.textContent = message;
       status.setAttribute('role', 'alert');
     };
-    if (widgetName !== 'reading-tracker' && widgetName !== 'reading-dashboard') {
+    if (widgetName !== 'reading-tracker' && widgetName !== 'reading-dashboard' && widgetName !== 'today-plan') {
       showError('O RemNote não informou um widget válido.');
     } else {
       const timeout = setTimeout(() => {

@@ -1,0 +1,11 @@
+import {test} from 'node:test';
+import {strict as assert} from 'node:assert';
+import type {RNPlugin} from '@remnote/plugin-sdk';
+import {showDailyPlan,dailyKeys} from '../src/remnote/daily-plan';
+import {dailyActivities} from '../src/daily-plan';
+import {parseBackup} from '../src/remnote/storage';
+import {studyDay} from '../src/resume';
+function fake(){const local=new Map<string,unknown>();let calls=0;let failure=false;let base='a';return{local,get calls(){return calls;},set failure(v:boolean){failure=v;},set base(v:string){base=v;},plugin:{kb:{getCurrentKnowledgeBaseData:async()=>({_id:base})},storage:{getLocal:async(k:string)=>local.get(k),setLocal:async(k:string,v:unknown)=>{local.set(k,v);}},widget:{openPopup:async()=>{calls++;if(failure)throw new Error('offline');}}} as unknown as RNPlugin};}
+test('popup abre uma vez ao dia por base nesta instalação; comando manual permite reabrir',async()=>{const f=fake();await showDailyPlan(f.plugin,true,'2026-11-22');await showDailyPlan(f.plugin,true,'2026-11-22');assert.equal(f.calls,1);await showDailyPlan(f.plugin,false,'2026-11-22');assert.equal(f.calls,2);await showDailyPlan(f.plugin,true,'2026-11-23');assert.equal(f.calls,3);f.base='b';await showDailyPlan(f.plugin,true,'2026-11-23');assert.equal(f.calls,4);});
+test('desativar só bloqueia abertura automática e falha não impede nova tentativa',async()=>{const f=fake();f.local.set(dailyKeys('a').enabled,false);await showDailyPlan(f.plugin,true);assert.equal(f.calls,0);await showDailyPlan(f.plugin);assert.equal(f.calls,1);f.local.set(dailyKeys('a').enabled,true);f.failure=true;await assert.rejects(showDailyPlan(f.plugin,true,'2026-11-23'));assert.equal(f.local.get(dailyKeys('a').seen),studyDay());f.failure=false;await showDailyPlan(f.plugin,true,'2026-11-23');assert.equal(f.calls,3);});
+test('resumo usa mesmo orçamento com revisão e não duplica aula quase concluída',()=>{const d=parseBackup({version:1,baseId:'a',globalPace:60,subjectPaces:{},subjectPhases:{s:1},lessons:{l:{totalPages:10,readPages:8,stars:5}}},'a');const map=new Map([['l','s']]);const rows=dailyActivities(d,map,{});assert.equal(rows.length,1);assert.equal(rows[0].finish,true);d.subjectDailyMinutes=1;assert.equal(dailyActivities(d,map,{s:60}).length,0);d.preparation={...d.preparation!,mode:'post',exams:[]};assert.equal(dailyActivities(d,map,{}).length,0);});

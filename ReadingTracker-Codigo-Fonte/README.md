@@ -259,3 +259,17 @@ Em Ajustes, o limite diário por disciplina começa em 2 horas. Soma todos os te
 Informe o tempo efetivo para que o limite considere o estudo realizado: páginas ou questões sem duração não permitem calcular esse consumo. Registros fora do planejamento não consomem o limite. É possível registrar o tempo real mesmo que ultrapasse o teto; o teto restringe sugestões, não o histórico.
 
 O backup passa ao formato 5 para guardar o limite por disciplina, com migração automática dos formatos anteriores e padrão de 120 minutos. Atualize as demais instalações antes de compartilhar a mesma base com esta versão.
+
+## Lista de atenção · versão 0.1.25
+A lista de aulas que precisam de atenção considera o limite por disciplina configurado em Ajustes, os tempos contabilizados hoje e a revisão sugerida. Disciplinas com menos de um minuto disponível ficam fora da lista do dia, preservando seu histórico e reaparecendo quando houver saldo.
+
+
+## Plano de hoje · versão 0.1.26
+
+Ao ativar o plugin pela primeira vez no dia, ele solicita ao RemNote uma janela central com o saldo de revisão e avanço, até dois blocos de flashcards e três atividades prioritárias. Leituras que cabem integralmente no bloco aparecem como Concluir a leitura, com páginas restantes. São atividades do mesmo orçamento, respeitando o limite por disciplina e a alternância, sem tempo extra para as conclusões rápidas.
+
+Use Iniciar/Revisar bloco para resolver cartões com o mesmo registro de tempo, acertos e erros já existente; Abrir aula fecha o popup e leva ao documento com os controles normais de estudo. Ver dashboard e Revisões e aulas abrem a nota existente na aba correspondente. É necessário criar essa nota uma vez pelo comando Abrir Dashboard de Estudos.
+
+A janela usa os últimos filtros de fases, Pareto e tag do painel nesta máquina. No pós-edital, usa os concursos ativos e sua disponibilidade. O resumo é uma prévia; o dashboard mantém o plano completo e a configuração dos blocos. As quantidades de revisão começam no padrão de dez flashcards por disciplina.
+
+Agora não e o X fecham sem gravar estudos. Em Ajustes > Plano de hoje, desative a abertura automática ou abra novamente. O comando Abrir Plano de hoje também permite reabrir a qualquer momento. A preferência e o controle de uma abertura por dia são locais, separados por base e máquina; não alteram o formato do backup de estudos. A abertura automática ocorre na ativação do plugin, incluindo instalação/atualização, e não interrompe uma sessão que já estava aberta quando vira o dia. A apresentação e as dimensões finais dependem da janela modal do RemNote; a área interna tem largura responsiva, rolagem e saída visível.

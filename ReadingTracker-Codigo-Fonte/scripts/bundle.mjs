@@ -6,6 +6,7 @@ const port = Number(process.env.READING_TRACKER_PORT ?? 8080);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Porta inválida.');
 const options = {
   entryPoints: {
+    'today-plan-sandbox': 'src/widgets/today-plan.tsx',
     'index-sandbox': 'src/widgets/index.tsx',
     'reading-tracker-sandbox': 'src/widgets/reading-tracker.tsx',
     'reading-dashboard-sandbox': 'src/widgets/reading-dashboard.tsx',
@@ -24,6 +25,7 @@ const options = {
 const nativeOptions = {
   ...options,
   entryPoints: {
+    'today-plan': 'src/widgets/today-plan.tsx',
     index: 'src/widgets/index.tsx',
     'reading-tracker': 'src/widgets/reading-tracker.tsx',
     'reading-dashboard': 'src/widgets/reading-dashboard.tsx',
@@ -52,3 +54,4 @@ if (dev) {
 } else {
   await Promise.all([build(options), build(nativeOptions)]);
 }
+

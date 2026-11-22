@@ -24,6 +24,7 @@ try {
   [void][IO.Directory]::CreateDirectory($staging)
   # Explicitly package the public assets and current widget bundles only.
   $files = @(
+    'today-plan.js','today-plan.css','today-plan-sandbox.js','today-plan-sandbox.css',
     'index.html', 'index.js', 'index-sandbox.js',
     'reading-tracker.js', 'reading-tracker.css', 'reading-tracker-sandbox.js', 'reading-tracker-sandbox.css',
     'reading-dashboard.js', 'reading-dashboard.css', 'reading-dashboard-sandbox.js', 'reading-dashboard-sandbox.css',
@@ -56,4 +57,5 @@ try {
     if ($resolved -eq $staging) { Remove-Item -LiteralPath $resolved -Recurse -Force }
   }
 }
+
 

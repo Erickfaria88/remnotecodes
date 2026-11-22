@@ -76,3 +76,15 @@ test('migra formato antigo com padrão de duas horas e rejeita limite inválido'
   assert.equal(data().subjectDailyMinutes,120);assert.equal(data().version,5);
   assert.throws(()=>parseBackup({...data(),subjectDailyMinutes:null},'base'));
 });
+
+import {attentionLessons} from '../src/study-attention';
+test('lista de atenção respeita limite de hoje e reserva de revisão sem apagar necessidades futuras',()=>{
+  const d=data(); d.subjectDailyMinutes=90; d.sessions={a:session('a','ti',5100)};
+  assert.ok(attentionLessons(d,mapping,10,{day}).some(r=>r.id==='ti1'));
+  const filtered=attentionLessons(d,mapping,10,{day,reservedReviewSeconds:{ti:300}});
+  assert.deepEqual(filtered.map(r=>r.id),['other1']);
+  assert.ok(attentionLessons(d,mapping,10,{day:studyDay(1)}).some(r=>r.id==='ti1'));
+  assert.ok(attentionLessons(d,mapping,10).some(r=>r.id==='ti1'));
+  d.sessions.a.seconds=5341;
+  assert.ok(attentionLessons(d,mapping,10,{day}).every(r=>r.id==='other1'));
+});
