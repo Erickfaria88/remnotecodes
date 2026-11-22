@@ -1,6 +1,6 @@
-import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation, type RNPlugin } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin, type RNPlugin } from '@remnote/plugin-sdk';
 import { lessonRequestKey, type LessonDashboardRequest } from '../remnote/lesson-dashboard';
-import { DocumentProgress } from '../components/DocumentProgress';
+
 import { ParetoCoverage } from '../components/ParetoCoverage';
 import { SessionHistory } from '../components/SessionHistory';
 import type { SessionInput } from '../study-sessions';
@@ -103,7 +103,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
   const [scopeSubjects, setScopeSubjects] = useState<Map<string, string>>(new Map());
   const [scopeError, setScopeError] = useState('');
   const [collapsed, setCollapsed] = useState(false);
-  const [lessonPaneId, setLessonPaneId] = useState<string>();
+
   const [pickerOpen, setPickerOpen] = useState(false);
   const [subject, setSubject] = useState<Subject>();
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -228,11 +228,11 @@ function BaseTracker({ baseId }: { baseId: string }) {
   }
 
   async function openLesson(rem: Lesson['rem']) {
-    const paneId = isDashboard ? await plugin.window.getFocusedPaneId().catch(() => undefined) : undefined;
+
     await plugin.storage.setSession(openedLessonKey(baseId,rem._id),true);
     await plugin.window.openRem(rem);
     if (isDashboard) {
-      setLessonPaneId(paneId);
+
       setCollapsed(true);
     }
   }
@@ -357,7 +357,7 @@ function BaseTracker({ baseId }: { baseId: string }) {
         <button type="button" aria-pressed={view === 'settings'} onClick={() => setView('settings')}>Ajustes</button>
       </nav>}
     </header>
-    {data&&<StudyTimerControl baseId={baseId}/>}
+    {data&&!collapsed&&<StudyTimerControl baseId={baseId}/>}
     {data && !collapsed && <section className="rt-card rt-preparation-mode" aria-label="Modo de preparação">
       <label>Preparação<select disabled={busy} value={preparation.mode}
         onChange={(event) => void savePreparation({ ...preparation, mode: event.target.value as Preparation['mode'] }).catch(() => undefined)}>
@@ -369,9 +369,6 @@ function BaseTracker({ baseId }: { baseId: string }) {
     {data && (view === 'resume' || view === 'agenda') && <StudyFilters plugin={plugin}
       phases={data.subjectPhases} selection={phaseSelection} onPhases={setPhaseSelection}
       paretoOnly={paretoOnly} onPareto={setParetoOnly} tag={reviewTag} onTag={setReviewTag} tagsOnly={post} />}
-    {collapsed && <div className="rt-dashboard-progress">
-      <DocumentProgress location={WidgetLocation.DocumentBelowTitle} paneId={lessonPaneId} />
-    </div>}
     {error && <p role="alert">{error}</p>}
     {status && <p role="status">{status}</p>}
     {!data && <button disabled={busy} onClick={() => void run(async () => setData(await repository.load()))}>
@@ -517,6 +514,15 @@ function BaseTracker({ baseId }: { baseId: string }) {
         </label>
         <button className="rt-primary" disabled={busy}>Salvar tempo diário</button>
       </form>}
+      {data&&<form className="rt-card" key={'subject-cap:'+data.subjectDailyMinutes} onSubmit={event=>{
+        event.preventDefault();const hours=Number(new FormData(event.currentTarget).get('hours'));
+        void run(async()=>{if(!Number.isFinite(hours)||hours<=0||hours>24)throw new Error('Informe um limite entre 1 minuto e 24 horas.');
+          setData(await repository.saveSubjectDailyMinutes(Math.round(hours*60)));setStatus('Limite diário por disciplina atualizado.');});
+      }}>
+        <h3>Alternância entre disciplinas</h3><label>Máximo diário por disciplina (horas)<input name="hours" type="number" min="0.016666" max="24" step="any" required defaultValue={(data.subjectDailyMinutes??120)/60}/></label>
+        <p>Soma revisão, leitura, questões e demais atividades contabilizadas no dia. As sugestões respeitam esse teto e favorecem outras matérias após o último registro.</p>
+        <button disabled={busy}>Salvar limite por disciplina</button>
+      </form>}
       {data && <details>
         <summary>Planejamento das revisões</summary>
         <form key={'review-settings:' + formRevision} onSubmit={(event) => {
@@ -565,3 +571,5 @@ function BaseTracker({ baseId }: { baseId: string }) {
 }
 
 renderWidget(ReadingTracker);
+
+

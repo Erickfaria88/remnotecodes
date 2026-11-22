@@ -12,7 +12,7 @@ const data=()=>parseBackup({version:1,baseId:'base',globalPace:60,subjectPaces:{
 const subjects=new Map([['l1','s1'],['l2','s2'],['l3','s3']]);
 
 test('backups antigos permanecem em preparação normal; valida edital, vínculos, blocos e disponibilidade',()=>{
-  assert.equal(data().version,4);assert.equal(data().preparation!.mode,'normal');assert.equal(parsePreparation(prep()).exams.length,1);
+  assert.equal(data().version,5);assert.equal(data().preparation!.mode,'normal');assert.equal(parsePreparation(prep()).exams.length,1);
   const invalid=(edit:(p:Preparation)=>void)=>{const p=prep();edit(p);assert.throws(()=>parsePreparation(p));};
   invalid(p=>p.exams[0].date='2026-02-30');invalid(p=>p.exams[0].subjects[0].weight=0);
   invalid(p=>p.exams[0].subjects[0].block='missing');invalid(p=>p.exams[0].subjects[0].topics[0].lessonIds=['__proto__']);

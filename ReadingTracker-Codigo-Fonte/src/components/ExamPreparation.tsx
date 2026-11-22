@@ -133,6 +133,7 @@ export function ExamDashboard({plugin,data,busy,onSelect,onOpen,onManage,onSave,
   const [titles,setTitles]=useState<Map<string,{title:string;subject:string;subjectId:string}>>();const [error,setError]=useState('');
   const [loadedIds,setLoadedIds]=useState<string>();
   const [today,setToday]=useState(studyDay);
+  const [reservedReview,setReservedReview]=useState<Record<string,number>>({});
   useEffect(()=>{const timer=setInterval(()=>setToday(studyDay()),30000);return()=>clearInterval(timer);},[]);
   const allIds=[...new Set(activeExams(prep,today).flatMap(e=>e.subjects.flatMap(s=>s.topics.flatMap(t=>t.lessonIds))))].sort().join(',');
   useEffect(()=>{let active=true;setTitles(undefined);setError('');void (async()=>{
@@ -147,7 +148,7 @@ export function ExamDashboard({plugin,data,busy,onSelect,onOpen,onManage,onSave,
   if(error)return <section className="rt-card"><p role="alert">{error}</p></section>;
   if(!titles||loadedIds!==allIds)return <p>Carregando preparação pós-edital…</p>;
   const subjects=new Map([...titles].map(([id,row])=>[id,row.subjectId]));
-  const plan=buildExamPlan(data,prep,subjects,today);
+  const plan=buildExamPlan(data,prep,subjects,today,reservedReview);
   const reviewIds=examLessonIds(prep,today);const reviewTitles=new Map([...titles].filter(([id])=>reviewIds.has(id)));
   const showActivity=(row:typeof plan.selected[number],selected:boolean)=><article className="rt-row rt-exam-summary" key={row.id}>
     <h3>{row.lessonId?titles.get(row.lessonId)?.title??row.title:row.title}</h3>
@@ -167,8 +168,9 @@ export function ExamDashboard({plugin,data,busy,onSelect,onOpen,onManage,onSave,
     <div className="rt-exam-grid"><div className="rt-row"><strong>Saldo de hoje</strong><p>{hours(plan.budget.remainingSeconds/60)}</p></div>
       <div className="rt-row"><strong>Revisão disponível</strong><p>{plan.budget.review} min</p></div><div className="rt-row"><strong>Avanço e questões</strong><p>{plan.budget.study} min · {Math.round(plan.used)} min distribuídos</p></div></div>
     {!!plan.warnings.length&&<details><summary>Avisos de cadastro ({plan.warnings.length})</summary><ul>{plan.warnings.map(w=><li key={w}>{w}</li>)}</ul></details>}
-    <FlashcardPlan data={{...data,dailyMinutes:prep.availability[today]??data.dailyMinutes}} titles={reviewTitles} busy={busy} onOpen={onOpen} paretoOnly={false} tag={reviewTag} priorities={examReviewPriorities(prep,today)} onResultsSaved={onResultsSaved}/>
+    <FlashcardPlan data={{...data,dailyMinutes:prep.availability[today]??data.dailyMinutes}} titles={reviewTitles} busy={busy} onOpen={onOpen} paretoOnly={false} tag={reviewTag} priorities={examReviewPriorities(prep,today)} onResultsSaved={onResultsSaved} onPlanChange={setReservedReview}/>
     <h3>O que estudar agora?</h3><p>Mínimos em risco de preparação vêm primeiro; depois, relevância por minuto, prioridade do concurso e proximidade da prova. Até 60 min por disciplina em cada plano.</p>
+    <p>Máximo de {data.subjectDailyMinutes??120} min por disciplina no dia, somando registros e revisão sugerida. A alternância prioriza outras matérias após o último estudo.</p>
     <div className="rt-exam-grid">{plan.selected.map(row=>showActivity(row,true))}</div>
     {!plan.selected.length&&<p>Nenhuma atividade selecionada: confira o saldo, os vínculos e os avisos de cadastro.</p>}
     <details><summary>Fora do plano de hoje e lacunas ({plan.excluded.length})</summary><p>Atividades sem material, fora do saldo diário ou acima do limite por disciplina. Serão reconsideradas após novos registros.</p><div className="rt-exam-grid">{plan.excluded.map(row=>showActivity(row,false))}</div></details>

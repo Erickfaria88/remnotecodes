@@ -1,4 +1,5 @@
 import { orderReviewCandidates, type ReviewCandidate } from './review-plan';
+import type {ReviewSubjectLimits} from './subject-budget';
 export interface ReviewSelection {
   mode:'block'|'subject'|'lesson'|'auto';
   subjects?:string[];
@@ -6,7 +7,7 @@ export interface ReviewSelection {
   subjectCounts:Record<string,number>;lessonCounts:Record<string,number>;
 }
 export const validQuota=(n:unknown):n is number=>typeof n==='number'&&Number.isSafeInteger(n)&&n>=0&&n<=2000;
-export function balancedReview(candidates:ReviewCandidate[],subjectByLesson:Map<string,string>,selection:ReviewSelection,minutes:number,secondsPerCard:number) {
+export function balancedReview(candidates:ReviewCandidate[],subjectByLesson:Map<string,string>,selection:ReviewSelection,minutes:number,secondsPerCard:number,limits?:ReviewSubjectLimits) {
   if(!Number.isFinite(minutes)||minutes<=0||!Number.isFinite(secondsPerCard)||secondsPerCard<=0)return [];
   const groups=new Map<string,{limit:number;lessons:{id:string;cards:string[]}[];taken:number;cursor:number}>();
   for(const lesson of orderReviewCandidates(candidates)) {
@@ -21,6 +22,7 @@ export function balancedReview(candidates:ReviewCandidate[],subjectByLesson:Map<
     group.lessons.push({id:lesson.id,cards:[...lesson.cardIds]});groups.set(key,group);
   }
   const seen=new Set<string>();const selected=new Map<string,string[]>();
+  const used:Record<string,number>=Object.create(null);
   const capacity=Math.max(0,Math.floor(minutes*60/secondsPerCard));
   let remaining=capacity,progress=true;
   while(remaining>0&&progress) {
@@ -29,9 +31,12 @@ export function balancedReview(candidates:ReviewCandidate[],subjectByLesson:Map<
       if(!remaining||group.taken>=group.limit)continue;
       for(let i=0;i<group.lessons.length;i++) {
         const lesson=group.lessons[group.cursor++%group.lessons.length];
+        const subject=subjectByLesson.get(lesson.id)!;
+        if((used[subject]??0)+secondsPerCard>(limits?.remainingSeconds[subject]??Infinity))continue;
         let card=lesson.cards.shift();while(card&&seen.has(card))card=lesson.cards.shift();
         if(!card)continue;
         seen.add(card);const rows=selected.get(lesson.id)??[];rows.push(card);selected.set(lesson.id,rows);
+        used[subject]=(used[subject]??0)+secondsPerCard;
         group.taken++;remaining--;progress=true;break;
       }
     }

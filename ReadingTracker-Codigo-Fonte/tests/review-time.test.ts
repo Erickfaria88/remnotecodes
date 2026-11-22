@@ -73,8 +73,8 @@ test('falha de gravação e lote inválido não salvam parcialmente tempo ou exe
   await assert.rejects(()=>repo.commitAudit({...batch,reviewSessions:[{...batch.reviewSessions![0],auditId:'wrong'}]}));
   await repo.commitAudit(batch);assert.equal(remainingDailyTime(await repo.load(),day).usedSeconds,1200);
 });
-test('formato antigo com auditoria sem tempo continua legível no formato 4',()=>{
+test('formato antigo com auditoria sem tempo continua legível no formato 5',()=>{
   const before=parseBackup({version:1,baseId:'base',lessons:{},subjectPaces:{},globalPace:null},'base');
   const old={...before,version:3,auditBatches:{a1:{id:'a1',createdAt:now,entries:[]}}};
-  const upgraded=parseBackup(old,'base');assert.equal(upgraded.version,4);assert.equal(upgraded.auditBatches!.a1.reviewSessions,undefined);
+  const upgraded=parseBackup(old,'base');assert.equal(upgraded.version,5);assert.equal(upgraded.auditBatches!.a1.reviewSessions,undefined);
 });

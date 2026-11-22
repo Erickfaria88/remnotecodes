@@ -204,3 +204,6 @@ html.rt-reviewing .reading-tracker-panel.rt-review-practice {
 .rt-audit-items { min-width: 0; border: 0; margin: 0; padding: 0; }
 .rt-audit-items .rt-audit-row { margin-top: 10px; }
 .rt-audit-summary > .rt-actions { position: sticky; bottom: 0; z-index: 11; padding: 10px 0; background: var(--canvas); border-top: 1px solid var(--line); }
+.rt-review-plan > summary { cursor: pointer; padding: 8px 0; }
+.rt-review-summary { font-size: 12px; font-weight: 400; color: var(--muted); }
+.rt-review-plan > * + * { margin-top: 10px; }

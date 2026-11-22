@@ -6,10 +6,11 @@ import { paretoCoverage } from '../pareto';
 
 interface LessonName { title: string; subject: string; subjectId: string }
 
-export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, availableMinutes, paretoOnly }: {
+export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, availableMinutes, paretoOnly,reservedReviewSeconds={} }: {
   data: Backup; titles: Map<string, LessonName>; busy: boolean; onOpen: (id: string) => void;
   onSelect: (id: string) => void; availableMinutes?: number;
   paretoOnly: boolean;
+  reservedReviewSeconds?:Record<string,number>;
 }) {
   const subjects = new Map([...titles].map(([id, name]) => [id, name.subjectId]));
   const priorityIds = new Set([...new Set(subjects.values())].flatMap((subjectId) => {
@@ -19,7 +20,7 @@ export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, ava
   }));
   const candidates = paretoOnly ? new Map([...subjects].filter(([id]) => priorityIds.has(id))) : subjects;
   const budget = availableMinutes ?? remainingDailyTime(data).study;
-  const plan = buildAdvancePlan(data, candidates, budget, studyDay(), null);
+  const plan = buildAdvancePlan(data, candidates, budget, studyDay(), null,reservedReviewSeconds);
   return <section aria-label="O que estudar agora?">
     <h3>O que estudar agora?</h3>
     <div className="fields">
@@ -30,6 +31,7 @@ export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, ava
       Retomadas, leituras quase concluídas e reforços entram neste mesmo orçamento.</p>
     <p>Prioridade por fase e benefício por minuto, considerando estrelas, retomadas e necessidade de exercícios.
       Blocos de leitura de até 30 min e sessões de questões de até 20 min.</p>
+    <p>Máximo de {data.subjectDailyMinutes??120} min por disciplina no dia, somando o tempo registrado e a revisão sugerida. {plan.alternating?'A disciplina do último registro fica para depois, priorizando outras matérias elegíveis.':''}</p>
     {plan.selected.length === 0 ? <p>Nenhuma atividade disponível nesta fase. Confira as aulas cadastradas ou selecione Todas.</p> :
       <ul>{plan.selected.map((item) => {
         const name = titles.get(item.id)!;
@@ -49,6 +51,6 @@ export function StudyRecommendations({ data, titles, busy, onOpen, onSelect, ava
           </div>
         </li>;
       })}</ul>}
-    {plan.available > 0 && <p>{plan.available} min livres após as atividades sugeridas. Você pode ampliar uma sessão ou escolher outra fase.</p>}
+    {plan.available > 0 && <p>{plan.available} min livres após as atividades sugeridas. A alternância e os limites por disciplina podem deixar parte do saldo sem alocação; você pode selecionar outras fases.</p>}
   </section>;
 }

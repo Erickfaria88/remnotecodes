@@ -12,9 +12,10 @@ import { validIncidence } from '../pareto';
 import { validSession, type StudySession } from '../study-sessions';
 import { parsePreparation, type Preparation } from '../exam-preparation';
 import { validAuditBatch, countedQuestions, type AuditBatch } from '../question-audit';
+import {defaultSubjectDailyMinutes,validSubjectDailyMinutes} from '../subject-budget';
 
 export interface Backup {
-  version: 4;
+  version: 5;
   baseId: string;
   lessons: Record<string, ReadingRecord>;
   globalPace: number | null;
@@ -29,6 +30,7 @@ export interface Backup {
   sessions?: Record<string, StudySession>;
   preparation?: Preparation;
   auditBatches?: Record<string, AuditBatch>;
+  subjectDailyMinutes?:number;
 }
 
 interface SyncedStorage {
@@ -46,12 +48,15 @@ function validId(id: string) {
 }
 
 export function parseBackup(value: unknown, baseId: string): Backup {
-  if (!isObject(value) || ![1, 2, 3, 4].includes(value.version as number) || typeof value.baseId !== 'string') {
+  if (!isObject(value) || ![1, 2, 3, 4, 5].includes(value.version as number) || typeof value.baseId !== 'string') {
     throw new Error('Backup inválido ou versão incompatível.');
   }
   if (value.baseId !== baseId) throw new Error('Este backup pertence a outra base do RemNote.');
   if (value.version !== 1 && value.preparation === undefined) throw new Error('Cadastro de preparação ausente no backup.');
-  if ((value.version === 3 || value.version === 4) && value.auditBatches === undefined) throw new Error('Histórico de auditorias ausente no backup.');
+  if ((value.version as number)>=3 && value.auditBatches === undefined) throw new Error('Histórico de auditorias ausente no backup.');
+  if(value.version===5&&value.subjectDailyMinutes===undefined)throw new Error('Limite diário por disciplina ausente no backup.');
+  const subjectDailyMinutes=value.subjectDailyMinutes===undefined?defaultSubjectDailyMinutes:value.subjectDailyMinutes;
+  if(!validSubjectDailyMinutes(subjectDailyMinutes))throw new Error('Limite diário por disciplina inválido.');
   if (!isObject(value.lessons) || !isObject(value.subjectPaces) ||
       (value.globalPace !== null && !validPace(value.globalPace))) {
     throw new Error('Estrutura de backup inválida.');
@@ -156,7 +161,7 @@ export function parseBackup(value: unknown, baseId: string): Backup {
         ...(batch.reviewSessions?{reviewSessions:batch.reviewSessions.map(s=>({...s}))}:{})};
     }
   }
-  return { version: 4, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, sessions, auditBatches,
+  return { version: 5, baseId, reviews, exercises, lessons, globalPace: value.globalPace, subjectPaces, subjectPhases, dailyMinutes, sessions, auditBatches,subjectDailyMinutes,
     reviewShare, secondsPerCard, preparation: parsePreparation(value.preparation), ...(value.dailyMinutesCustomized === true ? { dailyMinutesCustomized: true as const } : {}) };
 }
 
@@ -231,6 +236,7 @@ export function createRepository(storage: SyncedStorage, baseId: string) {
   return {
     load,
     saveStudy,
+    saveSubjectDailyMinutes:(subjectDailyMinutes:number)=>write(async()=>({...await load(),subjectDailyMinutes})),
     commitAudit: (batch: AuditBatch) => write(async () => {
       if(!validAuditBatch(batch) || batch.createdAt>Date.now()+60000 || batch.entries.some(e=>e.at>batch.createdAt))throw new Error('Resumo de auditoria inválido.');
       const data=await load();

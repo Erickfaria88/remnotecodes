@@ -1,9 +1,12 @@
 import type { Backup } from './remnote/storage';
 import { effectivePace } from './progress';
 import { attentionLessons } from './study-attention';
+import {subjectSecondsRemaining,subjectUsage} from './subject-budget';
 
 export function buildAdvancePlan(data: Backup, subjects: Map<string, string>, budget: number,
-  today: string, phase: number | null) {
+  today: string, phase: number | null, reservedReviewSeconds:Record<string,number>={}) {
+  const remainingBySubject=subjectSecondsRemaining(data,subjects.values(),today,reservedReviewSeconds);
+  const {recent}=subjectUsage(data,today);
   const attention = new Map(attentionLessons(data, subjects, 10).map((row) => [row.id, row]));
   const candidates = [...subjects].flatMap(([id, subjectId]) => {
     const record = data.lessons[id];
@@ -32,14 +35,16 @@ export function buildAdvancePlan(data: Backup, subjects: Map<string, string>, bu
   let available = Math.max(0, budget);
   const subjectTime = new Map<string, number>();
   const selected: typeof candidates = [];
-  for (const item of candidates) {
+  const fresh=candidates.filter(c=>!recent.has(c.subjectId)&&(remainingBySubject[c.subjectId]??0)>=60);
+  const eligible=fresh.length?fresh:candidates;
+  for (const item of eligible) {
     if (available < 1) break;
-    const minutes = Math.min(item.minutes, available);
     const previous = subjectTime.get(item.subjectId) ?? 0;
-    if (previous > 0 && previous + minutes > 60) continue;
+    const minutes = Math.min(item.minutes, available,Math.max(0,Math.floor((remainingBySubject[item.subjectId]??0)/60)-previous),60-previous);
+    if(minutes<1)continue;
     selected.push({ ...item, minutes });
     subjectTime.set(item.subjectId, previous + minutes);
     available -= minutes;
   }
-  return { selected, totalMinutes: budget - available, available };
+  return { selected, totalMinutes: budget - available, available,alternating:fresh.length>0&&recent.size>0 };
 }

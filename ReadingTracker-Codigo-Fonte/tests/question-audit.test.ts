@@ -87,9 +87,9 @@ test('se a resposta do SDK falhar após gravar, consulta e retry encontram o mes
   assert.equal(verified.auditBatches!.lost_reply.entries.length,1);assert.equal(verified.exercises.lesson.correct,1);
   await repo.commitAudit(batch);assert.equal((await repo.load()).exercises.lesson.correct,1);
 });
-test('converte backups antigos para formato 4 e rejeita ledger duplicado ou incompleto',()=>{
+test('converte backups antigos para formato 5 e rejeita ledger duplicado ou incompleto',()=>{
   const old={version:1,baseId:'base',globalPace:null,subjectPaces:{},lessons:{}};
-  const migrated=parseBackup(old,'base');assert.equal(migrated.version,4);assert.deepEqual(Object.keys(migrated.auditBatches!),[]);
+  const migrated=parseBackup(old,'base');assert.equal(migrated.version,5);assert.deepEqual(Object.keys(migrated.auditBatches!),[]);
   const entry=approvedEntries([row(1)])[0];assert.throws(()=>parseBackup({...migrated,auditBatches:{a1:{id:'a1',createdAt:t+1000,entries:[entry]},a2:{id:'a2',createdAt:t+1000,entries:[entry]}}},'base'));
   assert.throws(()=>parseBackup({...migrated,auditBatches:undefined},'base'));
 });
