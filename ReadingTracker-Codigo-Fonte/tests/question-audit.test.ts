@@ -47,7 +47,8 @@ test('não contabiliza cartões sem resposta ou sem identificação; edição ma
 });
 test('separa dias locais em bloco que cruza meia-noite e sinaliza tentativa anterior ao bloco no dia',()=>{
   const midnight=new Date(2026,10,22,0).getTime();
-  const rows=auditRows([card()],{c1:[...baseline,{date:midnight-100,score:0},{date:midnight+100,score:1}]},midnight-1000,midnight+1000);
+  const beforeMidnight=[{date:midnight-2*86400000,score:1}];
+  const rows=auditRows([{...card(),baseline:beforeMidnight}],{c1:[...beforeMidnight,{date:midnight-100,score:0},{date:midnight+100,score:1}]},midnight-1000,midnight+1000);
   assert.equal(rows.length,2);assert.equal(new Set(approvedEntries(rows).map(r=>r.day)).size,2);
   const earlier=auditRows([{...card(),baseline:[{date:t-100,score:0}]}],{c1:[{date:t-100,score:0},{date:t+100,score:1}]},t,t+1000)[0];
   assert.equal(earlier.include,false);assert.match(earlier.issue,/antes do bloco/);
@@ -179,3 +180,5 @@ test('consulta que termina depois de fechar a tela não recria nem altera o rasc
   resume([{_id:'c1',repetitionHistory:[...baseline,{date:t+100,score:1}]}]);
   await assert.rejects(()=>pending,/encerrada/);assert.equal(local.size,0);
 });
+
+

@@ -273,3 +273,7 @@ Use Iniciar/Revisar bloco para resolver cartões com o mesmo registro de tempo, 
 A janela usa os últimos filtros de fases, Pareto e tag do painel nesta máquina. No pós-edital, usa os concursos ativos e sua disponibilidade. O resumo é uma prévia; o dashboard mantém o plano completo e a configuração dos blocos. As quantidades de revisão começam no padrão de dez flashcards por disciplina.
 
 Agora não e o X fecham sem gravar estudos. Em Ajustes > Plano de hoje, desative a abertura automática ou abra novamente. O comando Abrir Plano de hoje também permite reabrir a qualquer momento. A preferência e o controle de uma abertura por dia são locais, separados por base e máquina; não alteram o formato do backup de estudos. A abertura automática ocorre na ativação do plugin, incluindo instalação/atualização, e não interrompe uma sessão que já estava aberta quando vira o dia. A apresentação e as dimensões finais dependem da janela modal do RemNote; a área interna tem largura responsiva, rolagem e saída visível.
+
+## Cronômetro nos documentos filhos · versão 0.1.27
+Ao navegar para um filho ou descendente da aula com cronômetro em andamento, pausado ou concluído pendente, os mesmos controles aparecem abaixo do título. Pausar, retomar e concluir continuam usando o cronômetro original. O registro final pertence à aula original, sem criar registros para os documentos filhos. O botão Ir à aula permite voltar. Não há herança para disciplinas vizinhas ou pelo simples uso de portais. Nenhum formato de dados foi alterado.
+
