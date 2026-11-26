@@ -5,13 +5,13 @@ import type {AuditDraft} from '../remnote/question-audit';
 export function reviewTimePreview(draft:AuditDraft|undefined,input:ReviewTimeInput) {
   try{
     if(!draft)return {sessions:[],error:'Auditoria não preparada.'};
-    const counts=reviewedCardCounts(draft.cards,draft.histories,draft.startedAt,draft.endedAt??Date.now());
+    const counts=reviewedCardCounts(draft.cards,draft.histories,draft.startedAt,draft.endedAt??Date.now(),draft.manualAnswers);
     return {sessions:reviewSessions(draft.id,input,counts,draft.lessonInfo??{}),error:''};
   }catch(e){return {sessions:[],error:e instanceof Error?e.message:'Tempo inválido.'};}
 }
 export function ReviewTimeForm({draft,value,onChange,disabled,results}:{draft:AuditDraft;value:ReviewTimeInput;onChange:(value:ReviewTimeInput)=>void;disabled:boolean;
   results:Map<string,{correct:number;incorrect:number}>}) {
-  const counts=reviewedCardCounts(draft.cards,draft.histories,draft.startedAt,draft.endedAt??Date.now());
+  const counts=reviewedCardCounts(draft.cards,draft.histories,draft.startedAt,draft.endedAt??Date.now(),draft.manualAnswers);
   const ids=[...new Set(draft.cards.flatMap(c=>c.lessonId?[c.lessonId]:[]))].sort();
   const preview=reviewTimePreview(draft,value);
   const answered=ids.filter(id=>(counts[id]??0)>0);
@@ -50,3 +50,5 @@ export function ReviewTimeForm({draft,value,onChange,disabled,results}:{draft:Au
     </details>
   </fieldset>;
 }
+
+

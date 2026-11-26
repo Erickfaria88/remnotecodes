@@ -1,3 +1,4 @@
+import {ManualAnswerControl} from './ManualAnswerControl';
 import { Queue } from '@remnote/plugin-sdk';
 import { createPortal } from 'react-dom';
 import { useLayoutEffect, useState } from 'react';
@@ -46,9 +47,12 @@ export function ReviewPractice({ cards, onExit, baseId, owners, titles, onSaved,
     {audit.draft?.phase==='summary'?<QuestionAuditSummary audit={audit} titles={titles}/>:audit.draft&&<>
     <p className="rt-audit-notice">Modo de auditoria · exercícios só serão somados após sua confirmação. Use uma única fila de revisão por vez.</p>
     {!!audit.draft.cards.filter(c=>c.identityIssue||!c.baseline).length&&<p className="rt-audit-notice">{audit.draft.cards.filter(c=>c.identityIssue||!c.baseline).length} cartões precisarão de identificação ou conferência manual no resumo.</p>}
+    <ManualAnswerControl draft={audit.draft} onMark={audit.markAnswer} disabled={audit.working}/>
     <div className="rt-review-queue">
-      <Queue cardIds={cards} height={height} width="100%" />
+      <Queue cardIds={cards} height={Math.max(180,height-120)} width="100%" />
     </div>
     </>}
   </section>, host);
 }
+
+

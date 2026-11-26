@@ -6,7 +6,7 @@
   "version": {
     "major": 0,
     "minor": 1,
-    "patch": 27
+    "patch": 28
   },
   "manifestVersion": 1,
   "requestNative": false,
@@ -23,6 +23,7 @@
   ],
   "repoUrl": "http://localhost:8080"
 }
+
 
 
 

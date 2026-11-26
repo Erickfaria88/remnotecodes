@@ -1,3 +1,4 @@
+import type {ManualAnswer} from './manual-answer';
 import {historyDelta,outcome,validAuditId,type AuditCard,type Repetition} from './question-audit';
 import {formatDuration,parseDuration,type StudySession} from './study-sessions';
 import {studyDay,validStudyDay} from './resume';
@@ -8,12 +9,12 @@ export function validReviewTimeInput(value:unknown):value is ReviewTimeInput {
   return !!v && typeof v.enabled==='boolean' && typeof v.duration==='string' && v.duration.length<=20 && typeof v.day==='string'&&(v.day===''||validStudyDay(v.day)) &&
     Array.isArray(v.lessonIds)&&v.lessonIds.every(validAuditId)&&new Set(v.lessonIds).size===v.lessonIds.length && typeof v.counted==='boolean' && typeof v.note==='string'&&v.note.length<=400;
 }
-export function reviewedCardCounts(cards:AuditCard[],histories:Record<string,Repetition[]|null>,startedAt:number,endedAt:number) {
+export function reviewedCardCounts(cards:AuditCard[],histories:Record<string,Repetition[]|null>,startedAt:number,endedAt:number,manualAnswers:ManualAnswer[]=[]) {
   const counts:Record<string,number>={};const seen=new Set<string>();
   for(const card of cards)if(card.lessonId&&!seen.has(card.cardId)) {
     seen.add(card.cardId);
     const delta=historyDelta(card.baseline,histories[card.cardId]??null);
-    if(delta.entries.some(r=>r.date>=startedAt&&r.date<=endedAt&&outcome(r.score)!==null))counts[card.lessonId]=(counts[card.lessonId]??0)+1;
+    if(manualAnswers.some(m=>m.cardId===card.cardId&&m.lessonId===card.lessonId&&m.at>=startedAt&&m.at<=endedAt)||delta.entries.some(r=>r.date>=startedAt&&r.date<=endedAt&&outcome(r.score)!==null))counts[card.lessonId]=(counts[card.lessonId]??0)+1;
   }
   return counts;
 }
@@ -48,3 +49,4 @@ export function reviewSessions(batchId:string,input:ReviewTimeInput,counts:Recor
       note:('Revisão em bloco · rateio estimado por cartões avaliados. '+input.note.trim()).trim()};
   });
 }
+

@@ -1,9 +1,11 @@
+import {validManualAnswers,type ManualAnswer} from '../manual-answer';
 import type { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { historyDelta, tecQuestionKeys, validAuditId, validQuestionKey, type AuditCard, type AuditRow, type Repetition } from '../question-audit';
 import type {ReviewLessonInfo,ReviewTimeInput} from '../review-time';
 import {validReviewTimeInput} from '../review-time';
 
 export interface AuditDraft {
+  manualAnswers?:ManualAnswer[];
   version:1; id:string; baseId:string; startedAt:number; endedAt?:number;
   cards:AuditCard[]; histories:Record<string,Repetition[]|null>; issues:Record<string,string>;
   rows?:AuditRow[]; phase:'running'|'summary';
@@ -45,6 +47,7 @@ export function validDraft(value:unknown,baseId:string):value is AuditDraft {
       (c.allowCardIdentity===undefined||typeof c.allowCardIdentity==='boolean') &&
       (c.lessonId===undefined||validAuditId(c.lessonId)) && (c.questionKey===undefined||validQuestionKey(c.questionKey)) &&
       (c.identityIssue===undefined||typeof c.identityIssue==='string') && (c.baseline===null || readHistory(c.baseline)!==null)) &&
+    (d.manualAnswers===undefined||validManualAnswers(d.manualAnswers,d.cards)) &&
     !!d.histories && typeof d.histories==='object' && !Array.isArray(d.histories) && Object.values(d.histories).every(h=>h===null||readHistory(h)!==null) &&
     !!d.issues && typeof d.issues==='object' && !Array.isArray(d.issues) && Object.values(d.issues).every(i=>typeof i==='string');
 }
@@ -117,3 +120,4 @@ export async function refreshAudit(plugin:RNPlugin,draft:AuditDraft,owner=draft.
   await keepAuditDraft(plugin,next);
   return next;
 }
+
