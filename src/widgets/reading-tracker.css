@@ -207,3 +207,4 @@ html.rt-reviewing .reading-tracker-panel.rt-review-practice {
 .rt-review-plan > summary { cursor: pointer; padding: 8px 0; }
 .rt-review-summary { font-size: 12px; font-weight: 400; color: var(--muted); }
 .rt-review-plan > * + * { margin-top: 10px; }
+.rt-manual-answer{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 14px;border:1px solid #b9c8e3;background:#f4f7ff;border-radius:10px;margin:8px 0;position:sticky;top:56px;z-index:3}.rt-manual-answer>div{flex:1;min-width:180px}.rt-manual-answer small{display:block;max-width:650px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rt-manual-answer>small{flex-basis:100%}.rt-manual-answer button[aria-pressed=true]{background:#dce8ff;border-color:#2651ba;box-shadow:0 0 0 1px #2651ba}

@@ -277,3 +277,15 @@ Agora não e o X fecham sem gravar estudos. Em Ajustes > Plano de hoje, desative
 ## Cronômetro nos documentos filhos · versão 0.1.27
 Ao navegar para um filho ou descendente da aula com cronômetro em andamento, pausado ou concluído pendente, os mesmos controles aparecem abaixo do título. Pausar, retomar e concluir continuam usando o cronômetro original. O registro final pertence à aula original, sem criar registros para os documentos filhos. O botão Ir à aula permite voltar. Não há herança para disciplinas vizinhas ou pelo simples uso de portais. Nenhum formato de dados foi alterado.
 
+
+## Acertei / Errei durante o bloco · versão 0.1.28
+
+Na revisão aberta pelo Reading Tracker, o box Contar como questão oferece Acertei, Errei e Desfazer marcação para o cartão atual. A identificação usa a API da fila do SDK, confere se o cartão pertence ao bloco e verifica sua hierarquia até a aula antes de guardar. Se o cartão mudou durante a consulta, o clique é recusado com uma mensagem; não tenta adivinhar o próximo cartão.
+
+A marcação explícita já indica que o cartão é uma questão e seu resultado, sem depender da avaliação Esqueci/Difícil/Bom/Fácil para esse registro. Não altera nem avança a fila e não muda o algoritmo de repetição espaçada. Continue avaliando normalmente no RemNote. A indicação manual prevalece sobre a inferência do histórico na auditoria.
+
+O resultado fica no rascunho local deste bloco, recuperável após interrupção. Use o resumo final para conferir totais por aula e salvar ou sair sem registrar. Os totais de exercícios não mudam ao clicar nos novos botões. Desfazer remove a indicação explícita; a identificação automática anterior volta a valer, se houver. A marcação não é uma classificação permanente do flashcard para outros blocos.
+
+A mesma questão TEC conta uma vez por dia. Repetir ou alterar sua indicação no bloco não duplica o lançamento; a última indicação manual do dia substitui a anterior ainda não salva. Sem link TEC, a identidade manual usa o tópico do cartão: cópias em tópicos diferentes não podem ser deduplicadas automaticamente. Resultados já salvos não são alterados por uma nova marcação no mesmo dia; para corrigir um registro salvo, use a edição dos exercícios. Respostas manuais também identificam as aulas respondidas no registro de tempo.
+
+A API de cartão atual depende do RemNote e da fila incorporada: se ela não identificar um cartão do bloco, os botões ficam desativados. Nenhuma leitura do DOM ou simulação de cliques é utilizada. O formato do backup sincronizado permanece 5; apenas o rascunho local de auditoria ganha o campo opcional manualAnswers.

@@ -1,3 +1,5 @@
+import {applyManualAnswers,setManualAnswer} from '../manual-answer';
+import {isStudyDescendant} from '../study-descendant';
 import { AppEvents, usePlugin } from '@remnote/plugin-sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { approvedEntries, auditRows, countedQuestions, simplifyAuditRows, selectedAuditRows, type AuditRow } from '../question-audit';
@@ -39,7 +41,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
         next=await refreshAudit(plugin,recovered,owner.current);
         const issues=stableAuditRecovery(recovered,next)?next.issues:Object.fromEntries(next.cards.map(c=>[c.cardId,'Auditoria recuperada após interrupção ou alteração do histórico. Confira este item manualmente.']));
         next={...next,phase:'summary',endedAt:recovered.endedAt??Date.now(),issues};
-        next.rows=simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,issues),next.cards);
+        next.rows=applyManualAnswers(simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,issues),next.cards),next.cards,next.manualAnswers);
         if(live)setRows(next.rows);
       }else next=await prepareAudit(plugin,baseId,id.current,cards,owners,owner.current);
       const lessonIds=[...new Set(next.cards.flatMap(c=>c.lessonId?[c.lessonId]:[]))];
@@ -55,7 +57,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
       }
       next={...next,lessonInfo:info,...(!recovered?{practiceStartedAt:Date.now()}:{})};
       if(recovered) {
-        const counts=reviewedCardCounts(next.cards,next.histories,next.startedAt,next.endedAt!);
+        const counts=reviewedCardCounts(next.cards,next.histories,next.startedAt,next.endedAt!,next.manualAnswers);
         const input=recovered.reviewTime??defaultReviewTime(recovered.practiceStartedAt,recovered.endedAt,counts);
         next.reviewTime=input;if(live)setTimeInput(input);
       }
@@ -73,6 +75,23 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     return()=>clearInterval(timer);
   },[plugin,baseId,draft?.id]);
 
+  function markAnswer(expectedId:string,correct:boolean|null) {
+    const operation=chain.current.then(async()=>{
+      await verifyAuditBase(plugin,baseId);await claimAudit(plugin,baseId,id.current,owner.current);
+      const visible=await plugin.queue.getCurrentCard();
+      const latest=current.current;
+      const source=latest?.cards.find(c=>c.cardId===expectedId);
+      if(closing.current||leaving.current||!latest||latest.phase!=='running'||!visible||visible._id!==expectedId||visible.remId!==source?.remId||!source.lessonId)throw new Error('O cartão mudou ou não pertence a este bloco. Aguarde e tente novamente.');
+      if(!await isStudyDescendant(visible.remId,source.lessonId,async remId=>(await plugin.rem.findOne(remId))?.parent))throw new Error('Não foi possível confirmar a aula deste cartão.');
+      const checked=await plugin.queue.getCurrentCard();
+      if(checked?._id!==expectedId||closing.current||leaving.current)throw new Error('O cartão mudou antes da marcação. Tente no cartão atual.');
+      const at=Date.now();const questionKey=source.questionKey??'rem:'+source.remId;
+      const marks=correct===null?(latest.manualAnswers??[]).filter(m=>!(m.questionKey===questionKey&&studyDay(0,new Date(m.at))===studyDay())):setManualAnswer(latest.manualAnswers??[],{cardId:expectedId,lessonId:source.lessonId,questionKey,correct,at});
+      const next={...latest,manualAnswers:marks};
+      await keepAuditDraft(plugin,next);publish(next);
+    });
+    chain.current=operation.catch(()=>undefined);return operation;
+  }
   function scan() {
     const operation=chain.current.then(async()=>{
       if(!current.current)throw new Error('Auditoria ainda não preparada.');
@@ -102,8 +121,8 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     }
     if(leaving.current||!mounted.current)return;
     next={...next,phase:'summary',endedAt:finishedAt};
-    next.rows=simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,next.issues),next.cards);
-    const counts=reviewedCardCounts(next.cards,next.histories,next.startedAt,finishedAt);
+    next.rows=applyManualAnswers(simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt!,next.issues),next.cards),next.cards,next.manualAnswers);
+    const counts=reviewedCardCounts(next.cards,next.histories,next.startedAt,finishedAt,next.manualAnswers);
     next.reviewTime=defaultReviewTime(next.practiceStartedAt,finishedAt,counts);setTimeInput(next.reviewTime);
     publish(next);setRows(next.rows);
     try{await plugin.storage.setLocal(auditDraftKey(baseId),next);}catch{setError('Não foi possível guardar o rascunho local. Mantenha esta tela aberta até conferir.');}
@@ -154,14 +173,14 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
       if(includeQuestions&&JSON.stringify(fresh.histories)!==JSON.stringify(current.current.histories)) {
         const issues=Object.fromEntries(fresh.cards.map(c=>[c.cardId,'O histórico mudou durante a auditoria. Confira novamente antes de registrar.']));
         const next={...fresh,issues,endedAt:current.current.endedAt??Date.now()};
-        next.rows=simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt,issues),next.cards);
+        next.rows=applyManualAnswers(simplifyAuditRows(auditRows(next.cards,next.histories,next.startedAt,next.endedAt,issues),next.cards),next.cards,next.manualAnswers);
         publish(next);setRows(next.rows);
         throw new Error('O histórico mudou. O resumo foi atualizado e exige nova conferência.');
       }
       const latest=await repo.load();
       const selected=selectedAuditRows(rows,timeInput.lessonIds,countedQuestions(latest.auditBatches??{}));
       const entries=includeQuestions?approvedEntries(selected):[];
-      const counts=reviewedCardCounts(current.current.cards,current.current.histories,current.current.startedAt,current.current.endedAt??Date.now());
+      const counts=reviewedCardCounts(current.current.cards,current.current.histories,current.current.startedAt,current.current.endedAt??Date.now(),current.current.manualAnswers);
       const sessions=reviewSessions(id.current,timeInput,counts,current.current.lessonInfo??{});
       if(!entries.length&&!sessions.length)throw new Error('Informe o tempo de revisão ou selecione questões conferidas.');
       const createdAt=Math.max(current.current.endedAt??Date.now(),...entries.map(e=>e.at));
@@ -195,8 +214,8 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
         const latest=current.current;
         const end=latest.endedAt??endedAt;
         const next:AuditDraft={...latest,phase:'summary',endedAt:end,
-          rows:latest.phase==='summary'?rows:simplifyAuditRows(auditRows(latest.cards,latest.histories,latest.startedAt,end,latest.issues),latest.cards),
-          reviewTime:latest.phase==='summary'?timeInput:defaultReviewTime(latest.practiceStartedAt,end,reviewedCardCounts(latest.cards,latest.histories,latest.startedAt,end))};
+          rows:latest.phase==='summary'?rows:applyManualAnswers(simplifyAuditRows(auditRows(latest.cards,latest.histories,latest.startedAt,end,latest.issues),latest.cards),latest.cards,latest.manualAnswers),
+          reviewTime:latest.phase==='summary'?timeInput:defaultReviewTime(latest.practiceStartedAt,end,reviewedCardCounts(latest.cards,latest.histories,latest.startedAt,end,latest.manualAnswers))};
         await keepAuditDraft(plugin,next);
       });
       await Promise.race([save,new Promise<void>((_,reject)=>{timer=setTimeout(()=>reject(new Error('timeout')),1500);})]);
@@ -215,7 +234,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     }catch{setError('Ainda não foi possível verificar a gravação. Não registre manualmente até concluir esta conferência.');}
     finally{action.current=false;setWorking(false);}
   }
-  return {draft,rows,setRows,data,error,working,finish,confirm,discard,leave,savedCount,uncertain,verifyCommit,timeInput,setTimeInput,auditId:id.current};
+  return {markAnswer,draft,rows,setRows,data,error,working,finish,confirm,discard,leave,savedCount,uncertain,verifyCommit,timeInput,setTimeInput,auditId:id.current};
 }
 
 export function QuestionAuditSummary({audit,titles}:{audit:ReturnType<typeof useQuestionAudit>;titles:Map<string,{title:string;subject:string}>}) {
@@ -272,3 +291,6 @@ export function QuestionAuditSummary({audit,titles}:{audit:ReturnType<typeof use
     <details><summary>Regras de contagem</summary><p>Usa a primeira resposta válida da questão no dia; reapresentações não aumentam o total. Questões TEC são agrupadas pelo número. Questões 📖 sem link usam o tópico do cartão. Itens incertos ficam fora até conferência opcional. Se já lançou estas questões manualmente, não as registre novamente. Descartar não desfaz avaliações enviadas ao RemNote.</p></details>
   </div>;
 }
+
+
+
