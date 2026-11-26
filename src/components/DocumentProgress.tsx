@@ -1,3 +1,4 @@
+import {isStudyDescendant} from '../study-descendant';
 import { usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import { createRepository } from '../remnote/storage';
 import { documentMetrics } from '../document-metrics';
@@ -41,9 +42,10 @@ export function DocumentProgress({ location, paneId }: {
       const document = await reactive.rem.findOne(id);
       const opened=await reactive.storage.getSession<boolean>(openedLessonKey(base._id,id));
       const activeTimer=await createTimerRepository(reactive.storage,base._id).load().catch(()=>undefined);
+      const inheritedTimer= !inline&&activeTimer&&activeTimer.lessonId!==id&&await isStudyDescendant(id,activeTimer.lessonId,async current=>current===id?document?.parent:(await reactive.rem.findOne(current))?.parent);
       const ownLesson=!!(data.lessons[id]||data.exercises[id]||opened||activeTimer?.lessonId===id||Object.values(data.sessions??{}).some(s=>s.lessonId===id));
       return { ...documentMetrics(data, id, document?.children ?? []), id,
-        baseId:base._id,title:document?await documentTitle(reactive,document):'',
+        inheritedTimer:!!inheritedTimer,baseId:base._id,title:document?await documentTitle(reactive,document):'',
         timerEligible:ownLesson&&!!document?.parent&&!!document&&await document.isDocument(),
         isLesson: !(document?.children ?? []).some((child) => data.lessons[child] || data.exercises[child]) };
     } catch (error) {
@@ -52,7 +54,8 @@ export function DocumentProgress({ location, paneId }: {
     }
   }, [plugin, location, paneId]);
 
-  if (!metrics || (metrics.percent === null && !metrics.exercise&&!metrics.timerEligible)) return null;
+  if (!metrics || (metrics.percent === null && !metrics.exercise&&!metrics.timerEligible&&!metrics.inheritedTimer)) return null;
+  if(metrics.inheritedTimer)return <StudyTimerControl key={metrics.baseId+':inherited'} baseId={metrics.baseId}/>;
   async function openDashboard() {
     setOpening(true);
     setOpenError('');
@@ -96,4 +99,5 @@ export function DocumentProgress({ location, paneId }: {
     {openError && <p role="alert">{openError}</p>}
   </section>;
 }
+
 
