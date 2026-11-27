@@ -32,6 +32,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
   const [preview, setPreview] = useState<{ tasks: DailyTask[]; day: string }>();
   const [reservedReview,setReservedReview]=useState<Record<string,number>>({});
 
+  const titleIds=JSON.stringify([...new Set([...Object.keys(data.lessons),...Object.keys(data.exercises),...Object.values(data.sessions??{}).map(r=>r.lessonId),...Object.values(data.reviews).map(r=>r.lessonId)])].sort());
   useEffect(() => {
     const update = () => setToday(studyDay());
     const interval = setInterval(update, 30_000);
@@ -41,6 +42,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
       window.removeEventListener('focus', update);
     };
   }, []);
+
 
   useEffect(() => {
     let active = true;
@@ -67,7 +69,7 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     }
     void load().catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
-  }, [plugin, data]);
+  }, [plugin, data.baseId,titleIds]);
 
   const allSubjects = new Map(Array.from(allTitles ?? [], ([id, entry]) => [id, entry.subjectId] as const).filter(([id]) => !allowedLessonIds || allowedLessonIds.has(id)));
   const subjects = filterStudySubjects(data, allSubjects, phaseSelection);
@@ -161,4 +163,5 @@ export function ResumePanel({ plugin, data, onSelect, onOpen, onPublish, onRevie
     </>}
   </section>;
 }
+
 
