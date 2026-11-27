@@ -1,7 +1,7 @@
 import {isStudyDescendant} from '../study-descendant';
 import { usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import { createRepository } from '../remnote/storage';
-import { documentMetrics } from '../document-metrics';
+import { documentMetrics,progressRole } from '../document-metrics';
 import { useEffect, useState } from 'react';
 import { openLessonDashboard } from '../remnote/lesson-dashboard';
 import { studySteps } from '../study-steps';
@@ -38,16 +38,20 @@ export function DocumentProgress({ location, paneId }: {
               : context && 'documentId' in context ? context.documentId : undefined),
       ]);
       if (!base?._id || !id) return null;
+      if(inline&&(await reactive.window.getOpenPaneRemIds()).includes(id))return null;
       const data = await createRepository(reactive.storage, base._id).load();
       const document = await reactive.rem.findOne(id);
+      if(!document)return null;
+      const role=progressRole(data,id,document.children??[]);
+      if(inline&&(!data.lessons[id]&&!data.exercises[id]||role==='subject'))return null;
       const opened=await reactive.storage.getSession<boolean>(openedLessonKey(base._id,id));
       const activeTimer=await createTimerRepository(reactive.storage,base._id).load().catch(()=>undefined);
       const inheritedTimer= !inline&&activeTimer&&activeTimer.lessonId!==id&&await isStudyDescendant(id,activeTimer.lessonId,async current=>current===id?document?.parent:(await reactive.rem.findOne(current))?.parent);
       const ownLesson=!!(data.lessons[id]||data.exercises[id]||opened||activeTimer?.lessonId===id||Object.values(data.sessions??{}).some(s=>s.lessonId===id));
-      return { ...documentMetrics(data, id, document?.children ?? []), id,
+      return { ...documentMetrics(data, id, document.children ?? [],role), id,
         inheritedTimer:!!inheritedTimer,baseId:base._id,title:document?await documentTitle(reactive,document):'',
         timerEligible:ownLesson&&!!document?.parent&&!!document&&await document.isDocument(),
-        isLesson: !(document?.children ?? []).some((child) => data.lessons[child] || data.exercises[child]) };
+        isLesson:role==='lesson' };
     } catch (error) {
       console.error('Reading Tracker: progresso do documento', error);
       return null;
@@ -64,7 +68,7 @@ export function DocumentProgress({ location, paneId }: {
     finally { setOpening(false); }
   }
   return <section aria-label="Progresso de leitura" style={{
-    padding: '4px 2px', font: '13px/1.35 system-ui, sans-serif', color: 'inherit',
+    boxSizing:'border-box',width:'100%',padding: '4px 2px 10px', font: '13px/1.35 system-ui, sans-serif', color: 'inherit',
   }}>
     {metrics.percent !== null && <><progress max={100} value={metrics.percent} aria-label="Leitura concluída"
       style={{ width: '100%', height: 9, accentColor: '#5279db', display: 'block' }} />
@@ -99,5 +103,6 @@ export function DocumentProgress({ location, paneId }: {
     {openError && <p role="alert">{openError}</p>}
   </section>;
 }
+
 
 

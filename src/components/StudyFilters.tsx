@@ -1,3 +1,4 @@
+import {selectedReviewTags,toggleReviewTag} from '../study-scope';
 import type { PhaseSelection, ReviewTagFilter } from '../study-scope';
 import type { RNPlugin } from '@remnote/plugin-sdk';
 import { documentTitle } from '../remnote/documents';
@@ -36,7 +37,7 @@ export function StudyFilters({ plugin, phases, selection, onPhases, paretoOnly, 
       onChange={(event) => onPareto(event.target.checked)} /> Focar no núcleo de 80% para sugestões e revisões</label>
     {paretoOnly && <p>O núcleo é calculado por disciplina. Confira os avisos de cadastro parcial na cobertura.</p>}
     </>}
-    <details><summary>Filtrar flashcards por tag{tag ? ' · ' + tag.title : ''}</summary>
+    <details><summary>Filtrar flashcards por tag{tag ? ' · ' + selectedReviewTags(tag).map(t=>t.title).join(' ou ') : ''}</summary>
       <div className="rt-actions" aria-label="Tags frequentes">
         {['Erro', 'Foco', '80/20', 'Base Teórica'].map((name) => <button type="button" key={name}
           onClick={() => { setQuery(name); setResults([]); }}>{name}</button>)}
@@ -57,17 +58,18 @@ export function StudyFilters({ plugin, phases, selection, onPhases, paretoOnly, 
       </form>
       {error && <p role="alert">{error}</p>}
       <ul>{results.map((row) => <li key={row.id}>
-        <button type="button" onClick={() => { onTag({ id: row.id, title: row.title, includeInherited: false }); setResults([]); }}>
-          {row.title}{row.parent ? ' · Em ' + row.parent : ''}
+        <button type="button" aria-pressed={selectedReviewTags(tag).some(t=>t.id===row.id)} onClick={() => onTag(toggleReviewTag(tag,row))}>
+          {selectedReviewTags(tag).some(t=>t.id===row.id)?'✓ ':''}{row.title}{row.parent ? ' · Em ' + row.parent : ''}
         </button>
       </li>)}</ul>
       {tag && <>
-        <p>Tag selecionada · {tag.title}</p>
+        <p>Inclui cartões com qualquer uma das tags selecionadas (OU).</p><div className="rt-actions">{selectedReviewTags(tag).map(item=><button type="button" key={item.id} onClick={()=>onTag(toggleReviewTag(tag,item))} aria-label={"Remover tag "+item.title}>{item.title} ×</button>)}</div>
         <label className="rt-pareto-toggle"><input type="checkbox" checked={tag.includeInherited}
           onChange={(event) => onTag({ ...tag, includeInherited: event.target.checked })} /> Incluir tags herdadas dos tópicos-pai</label>
         <button type="button" onClick={() => onTag(undefined)}>Usar todos os flashcards pendentes</button>
       </>}
-      <p>Escolha o tópico que representa sua tag. O filtro de tag se aplica aos flashcards dos blocos.</p>
+      <p>Busque e selecione uma ou mais tags. As seleções anteriores são mantidas ao fazer outra busca. O filtro de tag se aplica aos flashcards dos blocos.</p>
     </details>
   </section>;
 }
+

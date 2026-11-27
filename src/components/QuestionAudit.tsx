@@ -143,7 +143,7 @@ export function useQuestionAudit({baseId,cards,owners,recovered,onSaved,onExit,t
     };
     plugin.event.addListener(AppEvents.QueueCompleteCard,undefined,refresh);
     plugin.event.addListener(AppEvents.QueueExit,undefined,exited);
-    const interval=setInterval(refresh,6000);
+    const interval=setInterval(refresh,30000);
     return()=>{clearTimeout(timer);clearInterval(interval);plugin.event.removeListener(AppEvents.QueueCompleteCard,undefined,refresh);plugin.event.removeListener(AppEvents.QueueExit,undefined,exited);};
   },[plugin,draft?.id,draft?.phase]);
   useEffect(()=>{
@@ -291,6 +291,7 @@ export function QuestionAuditSummary({audit,titles}:{audit:ReturnType<typeof use
     <details><summary>Regras de contagem</summary><p>Usa a primeira resposta válida da questão no dia; reapresentações não aumentam o total. Questões TEC são agrupadas pelo número. Questões 📖 sem link usam o tópico do cartão. Itens incertos ficam fora até conferência opcional. Se já lançou estas questões manualmente, não as registre novamente. Descartar não desfaz avaliações enviadas ao RemNote.</p></details>
   </div>;
 }
+
 
 
 

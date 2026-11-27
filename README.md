@@ -289,3 +289,27 @@ O resultado fica no rascunho local deste bloco, recuperável após interrupção
 A mesma questão TEC conta uma vez por dia. Repetir ou alterar sua indicação no bloco não duplica o lançamento; a última indicação manual do dia substitui a anterior ainda não salva. Sem link TEC, a identidade manual usa o tópico do cartão: cópias em tópicos diferentes não podem ser deduplicadas automaticamente. Resultados já salvos não são alterados por uma nova marcação no mesmo dia; para corrigir um registro salvo, use a edição dos exercícios. Respostas manuais também identificam as aulas respondidas no registro de tempo.
 
 A API de cartão atual depende do RemNote e da fila incorporada: se ela não identificar um cartão do bloco, os botões ficam desativados. Nenhuma leitura do DOM ou simulação de cliques é utilizada. O formato do backup sincronizado permanece 5; apenas o rascunho local de auditoria ganha o campo opcional manualAnswers.
+
+## Progresso da aula sem agregação indevida · versão 0.1.29
+A aula cadastrada usa seus próprios valores de páginas, etapas e exercícios, mesmo quando seus filhos também têm registros. As disciplinas identificadas por fase, ritmo ou histórico de estudos continuam agregando as aulas. A barra inline não repete o documento já aberto em um painel e não agrega uma disciplina dentro de outra linha. Os dados existentes são preservados; a correção trata a exibição e não apaga registros.
+
+
+## Várias tags na revisão · versão 0.1.30
+
+Em Prioridades de hoje > Filtrar flashcards por tag, busque e selecione uma ou mais tags. A lista de resultados sinaliza as selecionadas; buscar outra tag preserva as anteriores. Clique em uma tag selecionada para removê-la ou use Usar todos os flashcards pendentes para limpar o filtro.
+
+O filtro usa OU: Foco + Erro inclui cartões com Foco, com Erro ou com ambas, sem duplicar o mesmo cartão. A opção Incluir tags herdadas dos tópicos-pai vale para todas as tags selecionadas. O filtro é aplicado aos blocos de Retomar, Revisões, pós-edital e Plano de hoje. As preferências locais antigas com uma única tag continuam válidas. A seleção persiste nesta máquina e base, sem mudar o formato do backup sincronizado.
+
+## Consulta manual e desempenho · versão 0.1.31
+
+Os flashcards pendentes só são buscados ao clicar em Buscar flashcards para revisão. Abrir o dashboard, o popup inicial, expandir/recolher a seção ou trocar filtros não inicia a varredura de cartões. Selecione fases e tags e use Aplicar filtros e buscar flashcards uma vez. Atualizar consulta força uma nova busca quando o resultado atual ainda está válido.
+
+Uma única consulta fica em andamento por painel. Seu resultado guarda somente IDs de cartões agrupados por aula e o indicador de atraso, com um cache local por base válido por até dez minutos e para os mesmos filtros/dia. Reabrir uma tela pode restaurar esse cache sem consultar os cartões. Não é um cache compartilhado de objetos completos do SDK. Painéis em processos separados não compartilham uma chamada em andamento.
+
+Alterar duração, quantidade e modo dos blocos recalcula os resultados carregados. Mudança de filtros/dia, expiração do cache ou saída da resolução pede atualização manual. A tela mostra o horário da última consulta. Ao iniciar um bloco, o cache é conferido novamente; uma consulta invalidada por outra tela não é usada para iniciar a revisão. Sair da prática preserva o fluxo de rascunho/auditoria existente e invalida a lista de pendentes sem disparar outra busca.
+
+O popup inicial mostra o saldo e o avanço sem esperar pelos flashcards. Até carregar os blocos, a reserva global de revisão continua sendo respeitada; a distribuição dessa reserva por disciplina passa a ser considerada quando os blocos forem carregados. As sugestões de avanço são recalculadas nesse momento.
+
+Durante uma revisão, a captura prioriza os eventos de troca/avaliação. A verificação de segurança do cartão atual passou de 750 ms para 3 s e a conferência periódica de históricos de 6 s para 30 s. A conferência final antes de salvar, a validação do cartão no clique manual e os controles para evitar duplicação continuam ativos. A consulta de títulos das aulas em Retomar também deixa de se repetir a cada alteração de páginas/questões quando o conjunto de aulas é o mesmo; reabrir a tela atualiza os títulos.
+
+Sem mudança no formato do backup sincronizado. Não foi medida a redução de memória no RemNote; a mudança reduz os disparos automáticos e repetidos identificados no código.

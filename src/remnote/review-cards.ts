@@ -2,10 +2,10 @@ import type { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import type { Backup } from './storage';
 import type { ReviewCandidate } from '../review-plan';
 import { studyDay } from '../resume';
-import type { ReviewTagFilter } from '../study-scope';
+import {selectedReviewTags, type ReviewTagFilter } from '../study-scope';
 
 export async function loadReviewCards(plugin: RNPlugin, baseId: string, lessonIds: string[], now = new Date(),
-  tag?: Pick<ReviewTagFilter, 'id' | 'includeInherited'>) {
+  tag?: Pick<ReviewTagFilter, 'id' | 'includeInherited' | 'tags'>) {
   if ((await plugin.kb.getCurrentKnowledgeBaseData())._id !== baseId) throw new Error('A base ativa mudou.');
   const lessons = new Set(lessonIds);
   if (!lessons.size) return new Map<string, { cardIds: string[]; overdue: boolean }>();
@@ -41,6 +41,7 @@ export async function loadReviewCards(plugin: RNPlugin, baseId: string, lessonId
     while (id && !lessons.has(id) && !seen.has(id)) { seen.add(id); id = cache.get(id)?.parent; }
     if (id && lessons.has(id)) owners.set(remId, id);
   }
+  const selectedTags=new Set(selectedReviewTags(tag).map(t=>t.id));
   const tagged = new Set<string>();
   for (let offset = 0; offset < ids.length; offset += 16) {
     await Promise.all(ids.slice(offset, offset + 16).map(async (id) => {
@@ -50,7 +51,7 @@ export async function loadReviewCards(plugin: RNPlugin, baseId: string, lessonId
       if (rem) directions.set(id, await rem.getPracticeDirection());
       if (rem && tag && enabled.get(id)) {
         const tags = tag.includeInherited ? await rem.ancestorTagRem() : await rem.getTagRems();
-        if (tags.some((row) => row._id === tag.id)) tagged.add(id);
+        if (tags.some((row) => selectedTags.has(row._id))) tagged.add(id);
       }
     }));
   }
@@ -83,3 +84,4 @@ export function reviewCandidates(data: Backup, grouped: Map<string, { cardIds: s
     };
   });
 }
+

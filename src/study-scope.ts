@@ -2,7 +2,16 @@ import type { Backup } from './remnote/storage';
 import { paretoCoverage } from './pareto';
 
 export type PhaseSelection = 'auto' | 'all' | number[];
-export interface ReviewTagFilter { id: string; title: string; includeInherited: boolean }
+export interface ReviewTagFilter { id: string; title: string; includeInherited: boolean; tags?:{id:string;title:string}[] }
+export function selectedReviewTags(filter?:{id:string;title?:string;tags?:{id:string;title:string}[]}) {
+ const tags=filter?(filter.tags?.length?filter.tags:[{id:filter.id,title:filter.title??filter.id}]):[];
+ return [...new Map(tags.map(t=>[t.id,t])).values()];
+}
+export function reviewTagKey(filter?:ReviewTagFilter){return JSON.stringify([selectedReviewTags(filter).map(t=>t.id).sort(),filter?.includeInherited??false]);}
+export function toggleReviewTag(filter:ReviewTagFilter|undefined,tag:{id:string;title:string}):ReviewTagFilter|undefined {
+ const current=selectedReviewTags(filter);const tags=current.some(t=>t.id===tag.id)?current.filter(t=>t.id!==tag.id):[...current,tag];
+ return tags.length?{...tags[0],tags,includeInherited:filter?.includeInherited??false}:undefined;
+}
 
 export function matchesPhase(phase: number | undefined, selection: PhaseSelection, phases: Record<string, number>) {
   if (selection === 'all') return true;
@@ -22,3 +31,4 @@ export function filterStudySubjects(data: Backup, subjects: Map<string, string>,
   }));
   return new Map([...filtered].filter(([id]) => allowed.has(id)));
 }
+
